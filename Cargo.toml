@@ -1,0 +1,3 @@
+[workspace]
+members = ["sm4sh_model_py"]
+resolver = "3"

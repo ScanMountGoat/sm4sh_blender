@@ -1,0 +1,3 @@
+[submodule "sm4sh_model_py"]
+path = sm4sh_model_py
+url = https://github.com/ScanMountGoat/sm4sh_model_py
