@@ -21,12 +21,16 @@ def import_nud_model(
     model: sm4sh_model_py.nud.NudModel,
 ):
     armature = None
+    bone_names = []
     if model.skeleton is not None:
         armature = import_armature(operator, context, model.skeleton, "Armature")
+        bone_names = [b.name for b in model.skeleton.bones]
 
     for group in model.groups:
         for i, mesh in enumerate(group.meshes):
-            import_mesh(operator, context.collection, group, mesh, i, armature)
+            import_mesh(
+                operator, context.collection, group, mesh, i, armature, bone_names
+            )
 
 
 def import_mesh(
@@ -36,6 +40,7 @@ def import_mesh(
     mesh: sm4sh_model_py.nud.NudMesh,
     i: int,
     armature: Optional[bpy.types.Object],
+    bone_names: list[str],
 ):
     name = group.name
     blender_mesh = bpy.data.meshes.new(f"{name}[{i}]")
@@ -81,6 +86,11 @@ def import_mesh(
     blender_mesh.transform(y_up_to_z_up)
 
     obj = bpy.data.objects.new(blender_mesh.name, blender_mesh)
+
+    weights_indices = mesh.vertices.bones.bone_indices_weights()
+    if weights_indices is not None:
+        indices, weights = weights_indices
+        import_weight_groups(obj, indices, weights, bone_names)
 
     if armature is not None:
         obj.parent = armature
@@ -166,3 +176,32 @@ def import_armature(
     context.view_layer.objects.active = previous_active
 
     return armature
+
+
+def import_weight_groups(
+    blender_mesh,
+    bone_indices: np.ndarray,
+    bone_weights: np.ndarray,
+    bone_names: list[str],
+):
+    if len(bone_names) == 0:
+        return
+
+    bone_vertex_weights = {name: [] for name in bone_names}
+
+    for vertex_index, (indices, weights) in enumerate(zip(bone_indices, bone_weights)):
+        for index, weight in zip(indices, weights):
+            if weight > 0.0:
+                name = bone_names[index]
+                bone_vertex_weights[name].append((vertex_index, weight))
+
+    for name, weights in bone_vertex_weights.items():
+        # Lazily load only used vertex groups.
+        if len(weights) > 0:
+            group = blender_mesh.vertex_groups.get(name)
+            if group is None:
+                group = blender_mesh.vertex_groups.new(name=name)
+
+                # TODO: Is there a faster way than setting weights per vertex?
+                for vertex_index, weight in weights:
+                    group.add([vertex_index], weight, "REPLACE")
