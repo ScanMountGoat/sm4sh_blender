@@ -47,7 +47,7 @@ class ImportNud(bpy.types.Operator, ImportHelper):
 
         start = time.time()
 
-        import_nud_model(self, model)
+        import_nud_model(self, context, model)
 
         end = time.time()
         print(f"Import Blender Scene: {end - start}")
