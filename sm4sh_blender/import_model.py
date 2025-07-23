@@ -33,8 +33,10 @@ def import_mesh(
     name = group.name
     blender_mesh = bpy.data.meshes.new(f"{name}[{i}]")
 
-    # TODO: Convert strips to tris
     indices = mesh.vertex_indices.astype(np.uint32)
+    if mesh.primitive_type == sm4sh_model_py.nud.PrimitiveType.TriangleStrip:
+        indices = triangle_strip_to_triangle_list(indices)
+
     loop_start = np.arange(0, indices.shape[0], 3, dtype=np.uint32)
     loop_total = np.full(loop_start.shape[0], 3, dtype=np.uint32)
 
@@ -64,3 +66,29 @@ def import_mesh(
 
     obj = bpy.data.objects.new(blender_mesh.name, blender_mesh)
     collection.objects.link(obj)
+
+
+def triangle_strip_to_triangle_list(indices):
+    # Convert triangle strips to triangle lists.
+    # TODO: move this to Rust with tests.
+    new_indices = []
+
+    index = 0
+    for i in range(indices.shape[0] - 2):
+        face = indices[i : i + 3]
+        # TODO: Skip degenerate triangles.
+
+        # Restart primitive assembly if the index is -1.
+        # https://registry.khronos.org/vulkan/specs/latest/html/vkspec.html#drawing
+        if 65535 in face:
+            index = 0
+            continue
+        else:
+            if index % 2 == 0:
+                new_indices.extend([face[0], face[1], face[2]])
+            else:
+                new_indices.extend([face[1], face[0], face[2]])
+
+            index += 1
+
+    return np.array(new_indices, dtype=np.uint32)
