@@ -89,8 +89,13 @@ def import_mesh(
 
     obj = bpy.data.objects.new(blender_mesh.name, blender_mesh)
 
+    if armature is not None:
+        obj.parent = armature
+        modifier = obj.modifiers.new(armature.data.name, type="ARMATURE")
+        modifier.object = armature
+
     if parent_bone_index := group.parent_bone_index:
-        # Parent the mesh to a bone using vertex weights.
+        # Convert bone parenting to vertex weights.
         parent_bone_name = bone_names[parent_bone_index]
         vertex_group = obj.vertex_groups.new(name=parent_bone_name)
         vertex_group.add(indices.tolist(), 1.0, "REPLACE")
@@ -99,11 +104,6 @@ def import_mesh(
         if weights_indices is not None:
             indices, weights = weights_indices
             import_weight_groups(obj, indices, weights, bone_names)
-
-        if armature is not None:
-            obj.parent = armature
-            modifier = obj.modifiers.new(armature.data.name, type="ARMATURE")
-            modifier.object = armature
 
     collection.objects.link(obj)
 
@@ -168,7 +168,6 @@ def import_armature(
         new_bone.matrix = y_up_to_z_up @ Matrix(transform) @ x_major_to_y_major
 
     for bone in skeleton.bones:
-        # TODO: Fix handling of 0xFFFFFFF (not quite 4 bytes) in sm4sh_lib.
         if bone.parent_bone_index is not None and bone.parent_bone_index < len(
             skeleton.bones
         ):
@@ -178,7 +177,7 @@ def import_armature(
 
     for bone in armature.data.edit_bones:
         # Prevent Blender from removing any bones.
-        bone.length = 0.1
+        bone.length = 0.5
 
     bpy.ops.object.mode_set(mode="OBJECT")
     context.view_layer.objects.active = previous_active
