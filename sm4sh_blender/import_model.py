@@ -19,7 +19,7 @@ def import_nud_model(
     operator,
     context,
     model: sm4sh_model_py.nud.NudModel,
-):
+) -> Optional[bpy.types.Object]:
     armature = None
     bone_names = []
     if model.skeleton is not None:
@@ -31,6 +31,8 @@ def import_nud_model(
             import_mesh(
                 operator, context.collection, group, mesh, i, armature, bone_names
             )
+
+    return armature
 
 
 def import_mesh(
@@ -87,15 +89,21 @@ def import_mesh(
 
     obj = bpy.data.objects.new(blender_mesh.name, blender_mesh)
 
-    weights_indices = mesh.vertices.bones.bone_indices_weights()
-    if weights_indices is not None:
-        indices, weights = weights_indices
-        import_weight_groups(obj, indices, weights, bone_names)
+    if parent_bone_index := group.parent_bone_index:
+        # Parent the mesh to a bone using vertex weights.
+        parent_bone_name = bone_names[parent_bone_index]
+        vertex_group = obj.vertex_groups.new(name=parent_bone_name)
+        vertex_group.add(indices.tolist(), 1.0, "REPLACE")
+    else:
+        weights_indices = mesh.vertices.bones.bone_indices_weights()
+        if weights_indices is not None:
+            indices, weights = weights_indices
+            import_weight_groups(obj, indices, weights, bone_names)
 
-    if armature is not None:
-        obj.parent = armature
-        modifier = obj.modifiers.new(armature.data.name, type="ARMATURE")
-        modifier.object = armature
+        if armature is not None:
+            obj.parent = armature
+            modifier = obj.modifiers.new(armature.data.name, type="ARMATURE")
+            modifier.object = armature
 
     collection.objects.link(obj)
 

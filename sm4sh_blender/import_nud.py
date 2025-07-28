@@ -47,7 +47,10 @@ class ImportNud(bpy.types.Operator, ImportHelper):
 
         start = time.time()
 
-        import_nud_model(self, context, model)
+        armature = import_nud_model(self, context, model)
+        if armature is not None:
+            # Store the path to make exporting easier later.
+            armature["nud_path"] = path
 
         end = time.time()
         print(f"Import Blender Scene: {end - start}")
