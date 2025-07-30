@@ -1,0 +1,108 @@
+import bpy
+import time
+import numpy as np
+from pathlib import Path
+import re
+import os
+import itertools
+
+from sm4sh_blender.import_model import init_logging
+
+from .export_model import (
+    ExportException,
+    export_mesh,
+)
+
+from . import sm4sh_model_py
+
+from bpy_extras.io_utils import ExportHelper
+from bpy.props import StringProperty
+
+
+class ExportNud(bpy.types.Operator, ExportHelper):
+    """Export a Smash 4 model"""
+
+    bl_idname = "export_scene.nud"
+    bl_label = "Export Nud"
+
+    filename_ext = ".nud"
+
+    filter_glob: StringProperty(
+        default="*.nud",
+        options={"HIDDEN"},
+        maxlen=255,
+    )
+
+    def execute(self, context: bpy.types.Context):
+        init_logging()
+
+        try:
+            export_nud(self, context, self.filepath)
+        except ExportException as e:
+            self.report({"ERROR"}, str(e))
+            return {"FINISHED"}
+
+        return {"FINISHED"}
+
+
+def name_sort_index(name: str):
+    # Use integer sorting for any chunks of chars that are integers.
+    # This avoids unwanted behavior of alphabetical sorting like "10" coming before "2".
+    return [int(c) if c.isdigit() else c for c in re.split("([0-9]+)", name)]
+
+
+def export_nud(
+    operator: bpy.types.Operator,
+    context: bpy.types.Context,
+    output_nud_path: str,
+):
+    start = time.time()
+
+    armature = context.object
+    if armature is None or not isinstance(armature.data, bpy.types.Armature):
+        operator.report({"ERROR"}, "No armature selected")
+        return
+
+    # TODO: Export images?
+    groups = []
+    model = sm4sh_model_py.nud.NudModel(groups, [], [0, 0, 0, 0], None)
+
+    # TODO: ignore groups without weights?
+    vertex_group_names = set()
+    for o in armature.children:
+        for vg in o.vertex_groups:
+            vertex_group_names.add(vg.name)
+
+    # Use a consistent ordering since Blender collections don't have one.
+    sorted_objects = [o for o in armature.children if o.type == "MESH"]
+    sorted_objects.sort(key=lambda o: name_sort_index(o.name))
+
+    extract_name = lambda o: o.name.split("[")[0] if "[" in o.name else o.name
+
+    for name, objects in itertools.groupby(sorted_objects, key=extract_name):
+        # TODO: group with parent bone and regular skinning should be split?
+        meshes = []
+        for o in objects:
+            mesh = export_mesh(context, operator, o)
+            meshes.append(mesh)
+
+        group = sm4sh_model_py.nud.NudMeshGroup(
+            name,
+            meshes,
+            0.0,
+            [0, 0, 0, 0],
+            sm4sh_model_py.nud.BoneFlags.Skinning,
+            None,
+        )
+        groups.append(group)
+
+    end = time.time()
+    print(f"Create NudModel: {end - start}")
+
+    start = time.time()
+
+    nud = model.to_nud()
+    nud.save(output_nud_path)
+
+    end = time.time()
+    print(f"Export Files: {end - start}")
