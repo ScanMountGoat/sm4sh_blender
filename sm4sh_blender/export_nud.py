@@ -63,15 +63,15 @@ def export_nud(
         operator.report({"ERROR"}, "No armature selected")
         return
 
+    # TODO: Will the armature preserve bone ordering for the name list?
+    nud_path = armature.get("nud_path")
+    original_model = sm4sh_model_py.load_model(nud_path)
+    skeleton = original_model.skeleton
+    bone_names = [b.name for b in skeleton.bones]
+
     # TODO: Export images?
     groups = []
-    model = sm4sh_model_py.nud.NudModel(groups, [], [0, 0, 0, 0], None)
-
-    # TODO: ignore groups without weights?
-    vertex_group_names = set()
-    for o in armature.children:
-        for vg in o.vertex_groups:
-            vertex_group_names.add(vg.name)
+    model = sm4sh_model_py.NudModel(groups, [], [0, 0, 0, 0], None)
 
     # Use a consistent ordering since Blender collections don't have one.
     sorted_objects = [o for o in armature.children if o.type == "MESH"]
@@ -83,15 +83,15 @@ def export_nud(
         # TODO: group with parent bone and regular skinning should be split?
         meshes = []
         for o in objects:
-            mesh = export_mesh(context, operator, o)
+            mesh = export_mesh(context, operator, o, bone_names)
             meshes.append(mesh)
 
-        group = sm4sh_model_py.nud.NudMeshGroup(
+        group = sm4sh_model_py.NudMeshGroup(
             name,
             meshes,
             0.0,
             [0, 0, 0, 0],
-            sm4sh_model_py.nud.BoneFlags.Skinning,
+            sm4sh_model_py.BoneFlags.Skinning,
             None,
         )
         groups.append(group)

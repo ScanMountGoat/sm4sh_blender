@@ -53,7 +53,7 @@ def import_pac(operator: bpy.types.Operator, context: bpy.types.Context, path: s
 
     # TODO: Recreate the skeleton to avoid needing the path.
     nud_path = armature.get("nud_path")
-    model = sm4sh_model_py.nud.load_model(nud_path)
+    model = sm4sh_model_py.load_model(nud_path)
     skeleton = model.skeleton
 
     bone_names = {bone.hash: bone.name for bone in skeleton.bones}

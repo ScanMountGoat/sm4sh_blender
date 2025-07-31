@@ -38,11 +38,11 @@ def export_skeleton(armature: bpy.types.Object):
         hash = 0
 
         bones.append(
-            sm4sh_model_py.nud.VbnBone(
+            sm4sh_model_py.VbnBone(
                 name,
                 hash,
                 parent_bone_index,
-                sm4sh_model_py.nud.BoneType.Normal,
+                sm4sh_model_py.BoneType.Normal,
                 translation,
                 rotation,
                 scale,
@@ -211,14 +211,15 @@ def export_mesh(
     context: bpy.types.Context,
     operator: bpy.types.Operator,
     blender_mesh: bpy.types.Object,
-) -> sm4sh_model_py.nud.NudMesh:
+    bone_names: list[str],
+) -> sm4sh_model_py.NudMesh:
     # Work on a copy in case we need to make any changes.
     mesh_copy = blender_mesh.copy()
     mesh_copy.data = blender_mesh.data.copy()
 
     try:
         process_export_mesh(context, mesh_copy)
-        mesh = export_mesh_inner(operator, mesh_copy, blender_mesh.name)
+        mesh = export_mesh_inner(operator, mesh_copy, blender_mesh.name, bone_names)
         return mesh
     finally:
         bpy.data.meshes.remove(mesh_copy.data)
@@ -229,7 +230,8 @@ def export_mesh_inner(
     operator: bpy.types.Operator,
     blender_mesh: bpy.types.Object,
     mesh_name: str,
-) -> sm4sh_model_py.nud.NudMesh:
+    bone_names: list[str],
+) -> sm4sh_model_py.NudMesh:
 
     mesh_data: bpy.types.Mesh = blender_mesh.data
 
@@ -246,12 +248,16 @@ def export_mesh_inner(
     vertex_indices = export_vertex_indices(mesh_data)
     normals = export_normals(mesh_data, z_up_to_y_up, vertex_indices)
     tangents = export_tangents(mesh_data, z_up_to_y_up, vertex_indices)
-    bitangents = np.zeros_like(tangents)  # TODO: calculate proper bitangents
+    bitangents = np.zeros_like(tangents)
+    bitangents[:, :3] = np.cross(normals[:, :3], tangents[:, :3]) * tangents[
+        :, 3
+    ].reshape((-1, 1))
 
-    # TODO: Convert vertex groups to skinning.
     # TODO: Use a parent bone on the mesh group if single vertex group.
-    bone_indices = np.zeros((positions.shape[0], 4), dtype=np.uint32)
-    bone_weights = np.zeros((positions.shape[0], 4), dtype=np.float32)
+    influences = export_influences(operator, blender_mesh, mesh_data)
+    skin_weights = sm4sh_model_py.skinning.SkinWeights.from_influences(
+        influences, positions.shape[0], bone_names
+    )
 
     uvs = []
     for uv_layer in mesh_data.uv_layers:
@@ -264,32 +270,85 @@ def export_mesh_inner(
             byte_colors = export_color_attribute(
                 mesh_name, mesh_data, vertex_indices, color_attribute
             )
-    colors = sm4sh_model_py.nud.vertex.Colors.from_colors_byte(byte_colors)
+    colors = sm4sh_model_py.vertex.Colors.from_colors_byte(byte_colors)
 
-    normals = (
-        sm4sh_model_py.nud.vertex.Normals.from_normals_tangents_bitangents_float32(
-            normals, tangents, bitangents
-        )
+    normals = sm4sh_model_py.vertex.Normals.from_normals_tangents_bitangents_float32(
+        normals, tangents, bitangents
     )
-    bones = sm4sh_model_py.nud.vertex.Bones.from_bone_indices_weights_float32(
-        bone_indices, bone_weights
+    bones = sm4sh_model_py.vertex.Bones.from_bone_indices_weights_float32(
+        skin_weights.bone_indices, skin_weights.bone_weights
     )
-    vertices = sm4sh_model_py.nud.vertex.Vertices(
-        positions, normals, bones, colors, uvs
+    vertices = sm4sh_model_py.vertex.Vertices(positions, normals, bones, colors, uvs)
+
+    # TODO: Set the material hash?
+    # TODO: Set remaining properties?
+    material = sm4sh_model_py.NudMaterial(
+        0x94010161,
+        sm4sh_model_py.SrcFactor.One,
+        sm4sh_model_py.DstFactor.Zero,
+        sm4sh_model_py.AlphaFunc.Disabled,
+        sm4sh_model_py.CullMode.Inside,
+        [
+            sm4sh_model_py.NudTexture(
+                0x10080000,
+                sm4sh_model_py.MapMode.TexCoord,
+                sm4sh_model_py.WrapMode.ClampToEdge,
+                sm4sh_model_py.WrapMode.ClampToEdge,
+                sm4sh_model_py.MinFilter.Linear,
+                sm4sh_model_py.MagFilter.Linear,
+                sm4sh_model_py.MipDetail.OneMipLevelAnisotropicOff,
+            ),
+            sm4sh_model_py.NudTexture(
+                0x10080000,
+                sm4sh_model_py.MapMode.TexCoord,
+                sm4sh_model_py.WrapMode.ClampToEdge,
+                sm4sh_model_py.WrapMode.ClampToEdge,
+                sm4sh_model_py.MinFilter.Linear,
+                sm4sh_model_py.MagFilter.Linear,
+                sm4sh_model_py.MipDetail.OneMipLevelAnisotropicOff,
+            ),
+        ],
+        [sm4sh_model_py.NudProperty("NU_materialHash", [0, 0, 0, 0])],
     )
 
-    # TODO: create a default material
-    mesh = sm4sh_model_py.nud.NudMesh(
+    mesh = sm4sh_model_py.NudMesh(
         vertices,
         vertex_indices,
         False,
-        sm4sh_model_py.nud.PrimitiveType.TriangleList,
-        None,
+        sm4sh_model_py.PrimitiveType.TriangleList,
+        material,
         None,
         None,
         None,
     )
     return mesh
+
+
+def export_influences(
+    operator, blender_mesh, mesh_data
+) -> list[sm4sh_model_py.skinning.Influence]:
+    # Export Weights
+    # TODO: Reversing a vertex -> group lookup to a group -> vertex lookup is expensive.
+    # TODO: Does Blender not expose this directly?
+    group_to_weights = {vg.index: (vg.name, []) for vg in blender_mesh.vertex_groups}
+
+    for vertex in mesh_data.vertices:
+        # Blender doesn't enforce normalization, since it normalizes while animating.
+        # Normalize on export to ensure the weights work correctly in game.
+        weight_sum = sum([g.weight for g in vertex.groups])
+        for group in vertex.groups:
+            weight = sm4sh_model_py.skinning.VertexWeight(
+                vertex.index, group.weight / weight_sum
+            )
+            group_to_weights[group.group][1].append(weight)
+
+    influences = []
+    for name, weights in group_to_weights.values():
+        if len(weights) > 0:
+            influence = sm4sh_model_py.skinning.Influence(name, weights)
+            influences.append(influence)
+
+    return influences
 
 
 def export_positions(mesh_data, z_up_to_y_up):
@@ -403,4 +462,4 @@ def export_uv_layer(mesh_name, mesh_data, positions, vertex_indices, uv_layer):
             message += ' Valid names are "TexCoord0" to "TexCoord8".'
             raise ExportException(message)
 
-    return sm4sh_model_py.nud.vertex.Uvs.from_uvs_float32(uvs)
+    return sm4sh_model_py.vertex.Uvs.from_uvs_float32(uvs)

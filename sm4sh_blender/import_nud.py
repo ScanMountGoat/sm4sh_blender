@@ -40,7 +40,7 @@ class ImportNud(bpy.types.Operator, ImportHelper):
     ):
         start = time.time()
 
-        model = sm4sh_model_py.nud.load_model(path)
+        model = sm4sh_model_py.load_model(path)
 
         end = time.time()
         print(f"Load Model: {end - start}")

@@ -18,7 +18,7 @@ def init_logging():
 def import_nud_model(
     operator,
     context,
-    model: sm4sh_model_py.nud.NudModel,
+    model: sm4sh_model_py.NudModel,
 ) -> Optional[bpy.types.Object]:
     armature = None
     bone_names = []
@@ -38,8 +38,8 @@ def import_nud_model(
 def import_mesh(
     operator,
     collection: bpy.types.Collection,
-    group: sm4sh_model_py.nud.NudMeshGroup,
-    mesh: sm4sh_model_py.nud.NudMesh,
+    group: sm4sh_model_py.NudMeshGroup,
+    mesh: sm4sh_model_py.NudMesh,
     i: int,
     armature: Optional[bpy.types.Object],
     bone_names: list[str],
@@ -142,9 +142,7 @@ def import_uvs(
 
 
 # https://github.com/ScanMountGoat/xenoblade_blender/blob/0228b8f2a8d30d1a166ea9f559fa1dd07e216f93/xenoblade_blender/import_root.py#L34
-def import_armature(
-    operator, context, skeleton: sm4sh_model_py.nud.VbnSkeleton, name: str
-):
+def import_armature(operator, context, skeleton: sm4sh_model_py.VbnSkeleton, name: str):
     armature = bpy.data.objects.new(name, bpy.data.armatures.new(name))
     bpy.context.collection.objects.link(armature)
 
@@ -191,24 +189,17 @@ def import_weight_groups(
     bone_weights: np.ndarray,
     bone_names: list[str],
 ):
-    if len(bone_names) == 0:
-        return
+    # This automatically removes zero weights.
+    skin_weights = sm4sh_model_py.skinning.SkinWeights(bone_indices, bone_weights)
+    influences = skin_weights.to_influences(bone_names)
 
-    bone_vertex_weights = {name: [] for name in bone_names}
-
-    for vertex_index, (indices, weights) in enumerate(zip(bone_indices, bone_weights)):
-        for index, weight in zip(indices, weights):
-            if weight > 0.0:
-                name = bone_names[index]
-                bone_vertex_weights[name].append((vertex_index, weight))
-
-    for name, weights in bone_vertex_weights.items():
+    for influence in influences:
         # Lazily load only used vertex groups.
-        if len(weights) > 0:
-            group = blender_mesh.vertex_groups.get(name)
-            if group is None:
-                group = blender_mesh.vertex_groups.new(name=name)
+        name = influence.bone_name
+        group = blender_mesh.vertex_groups.get(name)
+        if group is None:
+            group = blender_mesh.vertex_groups.new(name=name)
 
-                # TODO: Is there a faster way than setting weights per vertex?
-                for vertex_index, weight in weights:
-                    group.add([vertex_index], weight, "REPLACE")
+            # TODO: Is there a faster way than setting weights per vertex?
+            for weight in influence.weights:
+                group.add([weight.vertex_index], weight.weight, "REPLACE")
