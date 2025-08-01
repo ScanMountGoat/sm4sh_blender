@@ -2,7 +2,7 @@ import bpy
 
 bl_info = {
     "name": "Sm4sh Blender",
-    "description": "Import Smash 4 models",
+    "description": "Import and export Smash 4 models and animations",
     "author": "ScanMountGoat (SMG)",
     "version": (0, 1, 0),
     "blender": (4, 1, 0),

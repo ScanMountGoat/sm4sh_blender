@@ -281,7 +281,7 @@ def export_mesh_inner(
     vertices = sm4sh_model_py.vertex.Vertices(positions, normals, bones, colors, uvs)
 
     # TODO: Set the material hash?
-    # TODO: Set remaining properties?
+    # TODO: investigate why texture mip settings can cause crashes.
     material = sm4sh_model_py.NudMaterial(
         0x94010161,
         sm4sh_model_py.SrcFactor.One,
@@ -296,7 +296,7 @@ def export_mesh_inner(
                 sm4sh_model_py.WrapMode.ClampToEdge,
                 sm4sh_model_py.MinFilter.Linear,
                 sm4sh_model_py.MagFilter.Linear,
-                sm4sh_model_py.MipDetail.OneMipLevelAnisotropicOff,
+                sm4sh_model_py.MipDetail.OneMipLevelAnisotropicOff2,
             ),
             sm4sh_model_py.NudTexture(
                 0x10080000,
@@ -305,16 +305,26 @@ def export_mesh_inner(
                 sm4sh_model_py.WrapMode.ClampToEdge,
                 sm4sh_model_py.MinFilter.Linear,
                 sm4sh_model_py.MagFilter.Linear,
-                sm4sh_model_py.MipDetail.OneMipLevelAnisotropicOff,
+                sm4sh_model_py.MipDetail.OneMipLevelAnisotropicOff2,
             ),
         ],
-        [sm4sh_model_py.NudProperty("NU_materialHash", [0, 0, 0, 0])],
+        [
+            sm4sh_model_py.NudProperty("NU_colorSamplerUV", [1, 1, 0, 0]),
+            sm4sh_model_py.NudProperty("NU_fresnelColor", [1, 1, 1, 1]),
+            sm4sh_model_py.NudProperty("NU_blinkColor", [0, 0, 0, 0]),
+            sm4sh_model_py.NudProperty("NU_aoMinGain", [0, 0, 0, 0]),
+            sm4sh_model_py.NudProperty("NU_lightMapColorOffset", [0, 0, 0, 0]),
+            sm4sh_model_py.NudProperty("NU_fresnelParams", [1, 0, 0, 0]),
+            sm4sh_model_py.NudProperty("NU_alphaBlendParams", [0, 0, 0, 0]),
+            sm4sh_model_py.NudProperty("NU_materialHash", [0, 0, 0, 0]),
+        ],
     )
 
+    # TODO: why does unk3 need to be True to load in Smash Forge?
     mesh = sm4sh_model_py.NudMesh(
         vertices,
         vertex_indices,
-        False,
+        True,
         sm4sh_model_py.PrimitiveType.TriangleList,
         material,
         None,

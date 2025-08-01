@@ -1,5 +1,5 @@
 # sm4sh_blender [![wiki](https://img.shields.io/badge/wiki-guide-success)](https://github.com/scanmountgoat/xenoblade_blender/wiki)
-A Blender addon for importing models and animations for Smash 4 for Wii U.
+A Blender addon for importing and exporting models and animations for Smash 4 for Wii U.
 
 Report bugs or request new features in [issues](https://github.com/ScanMountGoat/sm4sh_blender/issues). Check the [wiki](https://github.com/ScanMountGoat/sm4sh_blender/wiki) for more usage information.
 
