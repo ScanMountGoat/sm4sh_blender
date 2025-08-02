@@ -259,10 +259,12 @@ def export_mesh_inner(
         influences, positions.shape[0], bone_names
     )
 
-    uvs = []
+    uv_layers = []
     for uv_layer in mesh_data.uv_layers:
-        uv = export_uv_layer(mesh_name, mesh_data, positions, vertex_indices, uv_layer)
-        uvs.append(uv)
+        uvs = export_uv_layer(mesh_data, positions, vertex_indices, uv_layer)
+        uv_layers.append(uvs)
+
+    uvs = sm4sh_model_py.vertex.Uvs.from_uvs_float32(uv_layers)
 
     byte_colors = np.ones((positions.shape[0], 4), dtype=np.uint8) * 0.5
     for color_attribute in mesh_data.color_attributes:
@@ -320,11 +322,9 @@ def export_mesh_inner(
         ],
     )
 
-    # TODO: why does unk3 need to be True to load in Smash Forge?
     mesh = sm4sh_model_py.NudMesh(
         vertices,
         vertex_indices,
-        True,
         sm4sh_model_py.PrimitiveType.TriangleList,
         material,
         None,
@@ -439,7 +439,7 @@ def export_color_attribute(mesh_name, mesh_data, vertex_indices, color_attribute
     return byte_colors
 
 
-def export_uv_layer(mesh_name, mesh_data, positions, vertex_indices, uv_layer):
+def export_uv_layer(mesh_data, positions, vertex_indices, uv_layer):
     uvs = np.zeros((positions.shape[0], 2), dtype=np.float32)
     loop_uvs = np.zeros(len(mesh_data.loops) * 2, dtype=np.float32)
     uv_layer.data.foreach_get("uv", loop_uvs)
@@ -447,29 +447,4 @@ def export_uv_layer(mesh_name, mesh_data, positions, vertex_indices, uv_layer):
     # Flip vertically to match in game.
     uvs[:, 1] = 1.0 - uvs[:, 1]
 
-    # TODO: Pass the index as a parameter instead?
-    match uv_layer.name:
-        case "UV0":
-            index = 0
-        case "UV1":
-            index = 1
-        case "UV2":
-            index = 2
-        case "UV3":
-            index = 3
-        case "UV4":
-            index = 4
-        case "UV5":
-            index = 5
-        case "UV6":
-            index = 6
-        case "UV7":
-            index = 7
-        case "UV8":
-            index = 8
-        case _:
-            message = f'"{uv_layer.name}" for mesh {mesh_name} is not one of the supported UV map names.'
-            message += ' Valid names are "TexCoord0" to "TexCoord8".'
-            raise ExportException(message)
-
-    return sm4sh_model_py.vertex.Uvs.from_uvs_float32(uvs)
+    return uvs

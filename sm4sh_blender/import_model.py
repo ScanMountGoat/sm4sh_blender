@@ -68,8 +68,8 @@ def import_mesh(
     if colors is not None:
         import_colors(blender_mesh, colors, "VertexColor")
 
-    for i, uvs in enumerate(mesh.vertices.uvs):
-        uvs = uvs.uvs()
+    uv_layers = mesh.vertices.uvs.uvs()
+    for i, uvs in enumerate(uv_layers):
         import_uvs(operator, blender_mesh, indices, uvs, f"UV{i}")
 
     blender_mesh.update()
