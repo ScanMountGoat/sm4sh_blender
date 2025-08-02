@@ -1,3 +1,4 @@
+from typing import Optional, Tuple
 import bpy
 import math
 
@@ -212,15 +213,14 @@ def export_mesh(
     operator: bpy.types.Operator,
     blender_mesh: bpy.types.Object,
     bone_names: list[str],
-) -> sm4sh_model_py.NudMesh:
+) -> Tuple[sm4sh_model_py.NudMesh, Optional[int]]:
     # Work on a copy in case we need to make any changes.
     mesh_copy = blender_mesh.copy()
     mesh_copy.data = blender_mesh.data.copy()
 
     try:
         process_export_mesh(context, mesh_copy)
-        mesh = export_mesh_inner(operator, mesh_copy, blender_mesh.name, bone_names)
-        return mesh
+        return export_mesh_inner(operator, mesh_copy, blender_mesh.name, bone_names)
     finally:
         bpy.data.meshes.remove(mesh_copy.data)
 
@@ -231,7 +231,7 @@ def export_mesh_inner(
     blender_mesh: bpy.types.Object,
     mesh_name: str,
     bone_names: list[str],
-) -> sm4sh_model_py.NudMesh:
+) -> Tuple[sm4sh_model_py.NudMesh, Optional[int]]:
 
     mesh_data: bpy.types.Mesh = blender_mesh.data
 
@@ -253,11 +253,27 @@ def export_mesh_inner(
         :, 3
     ].reshape((-1, 1))
 
-    # TODO: Use a parent bone on the mesh group if single vertex group.
     influences = export_influences(operator, blender_mesh, mesh_data)
-    skin_weights = sm4sh_model_py.skinning.SkinWeights.from_influences(
-        influences, positions.shape[0], bone_names
-    )
+
+    parent_bone_index = None
+    bones = None
+
+    if len(influences) > 1:
+        skin_weights = sm4sh_model_py.skinning.SkinWeights.from_influences(
+            influences, positions.shape[0], bone_names
+        )
+        bones = sm4sh_model_py.vertex.Bones(
+            skin_weights.bone_indices,
+            skin_weights.bone_weights,
+            sm4sh_model_py.vertex.BoneElementType.Float32,
+        )
+    elif len(influences) == 1:
+        # Avoid storing weights if there is only one influence.
+        parent_name = influences[0].bone_name
+        for i, name in enumerate(bone_names):
+            if name == parent_name:
+                parent_bone_index = i
+                break
 
     uv_layers = []
     for uv_layer in mesh_data.uv_layers:
@@ -276,9 +292,6 @@ def export_mesh_inner(
 
     normals = sm4sh_model_py.vertex.Normals.from_normals_tangents_bitangents_float32(
         normals, tangents, bitangents
-    )
-    bones = sm4sh_model_py.vertex.Bones.from_bone_indices_weights_float32(
-        skin_weights.bone_indices, skin_weights.bone_weights
     )
     vertices = sm4sh_model_py.vertex.Vertices(positions, normals, bones, colors, uvs)
 
@@ -331,7 +344,7 @@ def export_mesh_inner(
         None,
         None,
     )
-    return mesh
+    return mesh, parent_bone_index
 
 
 def export_influences(

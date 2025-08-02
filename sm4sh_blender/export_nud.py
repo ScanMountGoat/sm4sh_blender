@@ -80,21 +80,30 @@ def export_nud(
     extract_name = lambda o: o.name.split("[")[0] if "[" in o.name else o.name
 
     for name, objects in itertools.groupby(sorted_objects, key=extract_name):
-        # TODO: group with parent bone and regular skinning should be split?
-        meshes = []
+        meshes_parent_indices = []
         for o in objects:
-            mesh = export_mesh(context, operator, o, bone_names)
-            meshes.append(mesh)
+            mesh_parent_index = export_mesh(context, operator, o, bone_names)
+            meshes_parent_indices.append(mesh_parent_index)
 
-        group = sm4sh_model_py.NudMeshGroup(
-            name,
-            meshes,
-            0.0,
-            [0, 0, 0, 0],
-            sm4sh_model_py.BoneFlags.Skinning,
-            None,
-        )
-        groups.append(group)
+        # Split since each group can only have one parent bone.
+        for parent_bone_index, meshes_parents in itertools.groupby(
+            meshes_parent_indices, key=lambda o: o[1]
+        ):
+            meshes = [mesh for mesh, _ in meshes_parents]
+            bone_flags = (
+                sm4sh_model_py.BoneFlags.Skinning
+                if parent_bone_index is None
+                else sm4sh_model_py.BoneFlags.ParentBone
+            )
+            group = sm4sh_model_py.NudMeshGroup(
+                name,
+                meshes,
+                0.0,
+                [0, 0, 0, 0],
+                bone_flags,
+                parent_bone_index,
+            )
+            groups.append(group)
 
     end = time.time()
     print(f"Create NudModel: {end - start}")

@@ -100,10 +100,8 @@ def import_mesh(
         vertex_group = obj.vertex_groups.new(name=parent_bone_name)
         vertex_group.add(indices.tolist(), 1.0, "REPLACE")
     else:
-        weights_indices = mesh.vertices.bones.bone_indices_weights()
-        if weights_indices is not None:
-            indices, weights = weights_indices
-            import_weight_groups(obj, indices, weights, bone_names)
+        if bones := mesh.vertices.bones:
+            import_weight_groups(obj, bones.bone_indices, bones.weights, bone_names)
 
     collection.objects.link(obj)
 
