@@ -64,9 +64,9 @@ def import_mesh(
     blender_mesh.vertices.add(positions.shape[0])
     blender_mesh.vertices.foreach_set("co", positions.reshape(-1))
 
-    colors = mesh.vertices.colors.colors()
+    colors = mesh.vertices.colors
     if colors is not None:
-        import_colors(blender_mesh, colors, "VertexColor")
+        import_colors(blender_mesh, colors.colors, "VertexColor")
 
     uv_layers = mesh.vertices.uvs.uvs()
     for i, uvs in enumerate(uv_layers):

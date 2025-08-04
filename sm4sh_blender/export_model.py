@@ -252,12 +252,13 @@ def export_mesh_inner(
     bitangents[:, :3] = np.cross(normals[:, :3], tangents[:, :3]) * tangents[
         :, 3
     ].reshape((-1, 1))
-
-    influences = export_influences(operator, blender_mesh, mesh_data)
+    tangents[:, 3] = 1.0
+    bitangents[:, 3] = 1.0
 
     parent_bone_index = None
     bones = None
 
+    influences = export_influences(blender_mesh, mesh_data)
     if len(influences) > 1:
         skin_weights = sm4sh_model_py.skinning.SkinWeights.from_influences(
             influences, positions.shape[0], bone_names
@@ -265,7 +266,7 @@ def export_mesh_inner(
         bones = sm4sh_model_py.vertex.Bones(
             skin_weights.bone_indices,
             skin_weights.bone_weights,
-            sm4sh_model_py.vertex.BoneElementType.Float32,
+            sm4sh_model_py.vertex.BoneElementType.Byte,
         )
     elif len(influences) == 1:
         # Avoid storing weights if there is only one influence.
@@ -280,17 +281,19 @@ def export_mesh_inner(
         uvs = export_uv_layer(mesh_data, positions, vertex_indices, uv_layer)
         uv_layers.append(uvs)
 
-    uvs = sm4sh_model_py.vertex.Uvs.from_uvs_float32(uv_layers)
+    uvs = sm4sh_model_py.vertex.Uvs.from_uvs_float16(uv_layers)
 
-    byte_colors = np.ones((positions.shape[0], 4), dtype=np.uint8) * 0.5
+    float_colors = np.ones((positions.shape[0], 4), dtype=np.uint8) * 0.5
     for color_attribute in mesh_data.color_attributes:
         if color_attribute.name == "VertexColor":
-            byte_colors = export_color_attribute(
+            float_colors = export_color_attribute(
                 mesh_name, mesh_data, vertex_indices, color_attribute
             )
-    colors = sm4sh_model_py.vertex.Colors.from_colors_byte(byte_colors)
 
-    normals = sm4sh_model_py.vertex.Normals.from_normals_tangents_bitangents_float32(
+    color_type = sm4sh_model_py.vertex.ColorElementType.Byte
+    colors = sm4sh_model_py.vertex.Colors(float_colors, color_type)
+
+    normals = sm4sh_model_py.vertex.Normals.from_normals_tangents_bitangents_float16(
         normals, tangents, bitangents
     )
     vertices = sm4sh_model_py.vertex.Vertices(positions, normals, bones, colors, uvs)
@@ -348,7 +351,7 @@ def export_mesh_inner(
 
 
 def export_influences(
-    operator, blender_mesh, mesh_data
+    blender_mesh, mesh_data
 ) -> list[sm4sh_model_py.skinning.Influence]:
     # Export Weights
     # TODO: Reversing a vertex -> group lookup to a group -> vertex lookup is expensive.
@@ -395,15 +398,7 @@ def export_normals(mesh_data, z_up_to_y_up, vertex_indices):
 
     normals = np.zeros((len(mesh_data.vertices), 4), dtype=np.float32)
     normals[:, :3][vertex_indices] = loop_normals @ z_up_to_y_up
-
-    # Some shaders use the 4th component for normal map intensity.
-    if attribute := mesh_data.attributes.get("VertexNormal"):
-        vertex_normals = np.zeros(len(mesh_data.vertices) * 4, dtype=np.float32)
-        attribute.data.foreach_get("color", vertex_normals)
-
-        normals[:, 3] = vertex_normals.reshape((-1, 4))[:, 3]
-    else:
-        normals[:, 3] = 1.0
+    normals[:, 3] = 1.0
 
     return normals
 
@@ -412,7 +407,6 @@ def export_tangents(mesh_data, z_up_to_y_up, vertex_indices):
     # Tangents are stored per loop instead of per vertex.
     loop_tangents = np.zeros(len(mesh_data.loops) * 3, dtype=np.float32)
     try:
-        # TODO: Why do some meshes not have UVs for Pyra?
         mesh_data.calc_tangents()
         mesh_data.loops.foreach_get("tangent", loop_tangents)
     except:
@@ -448,8 +442,7 @@ def export_color_attribute(mesh_name, mesh_data, vertex_indices, color_attribute
         raise ExportException(message)
 
     colors = colors.reshape((-1, 4))
-    byte_colors = (colors * 255.0).astype(np.uint8)
-    return byte_colors
+    return colors
 
 
 def export_uv_layer(mesh_data, positions, vertex_indices, uv_layer):

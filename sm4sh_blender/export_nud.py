@@ -90,17 +90,11 @@ def export_nud(
             meshes_parent_indices, key=lambda o: o[1]
         ):
             meshes = [mesh for mesh, _ in meshes_parents]
-            bone_flags = (
-                sm4sh_model_py.BoneFlags.Skinning
-                if parent_bone_index is None
-                else sm4sh_model_py.BoneFlags.ParentBone
-            )
             group = sm4sh_model_py.NudMeshGroup(
                 name,
                 meshes,
                 0.0,
                 [0, 0, 0, 0],
-                bone_flags,
                 parent_bone_index,
             )
             groups.append(group)
