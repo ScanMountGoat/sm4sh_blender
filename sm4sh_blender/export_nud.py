@@ -34,11 +34,16 @@ class ExportNud(bpy.types.Operator, ExportHelper):
         maxlen=255,
     )
 
+    original_nud: StringProperty(
+        name="Original Nud",
+        description="The original .nud file to use to generate the new model. Defaults to the armature's original_nud custom property if not set",
+    )
+
     def execute(self, context: bpy.types.Context):
         init_logging()
 
         try:
-            export_nud(self, context, self.filepath)
+            export_nud(self, context, self.filepath, self.original_nud.strip('"'))
         except ExportException as e:
             self.report({"ERROR"}, str(e))
             return {"FINISHED"}
@@ -56,6 +61,7 @@ def export_nud(
     operator: bpy.types.Operator,
     context: bpy.types.Context,
     output_nud_path: str,
+    original_nud_path: str,
 ):
     start = time.time()
 
@@ -64,11 +70,15 @@ def export_nud(
         operator.report({"ERROR"}, "No armature selected")
         return
 
-    # TODO: Will the armature preserve bone ordering for the name list?
-    nud_path = armature.get("nud_path")
-    original_model = sm4sh_model_py.load_model(nud_path)
-    skeleton = original_model.skeleton
-    bone_names = [b.name for b in skeleton.bones]
+    if original_nud_path == "":
+        original_nud_path = armature.get("original_nud")
+
+    original_model = sm4sh_model_py.load_model(original_nud_path)
+
+    # Preserve the original bone order since armatures don't preserve bone order.
+    bone_names = []
+    if skeleton := original_model.skeleton:
+        bone_names = [b.name for b in skeleton.bones]
 
     # TODO: Export images?
     groups = []

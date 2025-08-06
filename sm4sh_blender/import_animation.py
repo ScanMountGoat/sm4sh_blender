@@ -52,7 +52,7 @@ def import_pac(operator: bpy.types.Operator, context: bpy.types.Context, path: s
         armature.animation_data_create()
 
     # TODO: Recreate the skeleton to avoid needing the path.
-    nud_path = armature.get("nud_path")
+    nud_path = armature.get("original_nud")
     model = sm4sh_model_py.load_model(nud_path)
     skeleton = model.skeleton
 
