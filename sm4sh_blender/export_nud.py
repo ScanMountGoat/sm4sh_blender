@@ -100,6 +100,10 @@ def export_nud(
             )
             groups.append(group)
 
+    # Preserve the order of the original groups with new groups at the end.
+    name_pos = {g.name: i for i, g in enumerate(original_model.groups)}
+    groups.sort(key=lambda g: name_pos.get(g.name, 0xFFFFFFFF))
+
     end = time.time()
     print(f"Create NudModel: {end - start}")
 
