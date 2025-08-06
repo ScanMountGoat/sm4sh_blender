@@ -72,7 +72,7 @@ def import_mesh(
 
     colors = mesh.vertices.colors
     if colors is not None:
-        import_colors(blender_mesh, colors.colors, "VertexColor")
+        import_colors(blender_mesh, colors.colors, "Color")
 
     uv_layers = mesh.vertices.uvs.uvs()
     for i, uvs in enumerate(uv_layers):
