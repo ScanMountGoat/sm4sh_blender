@@ -242,23 +242,27 @@ def import_material(material: sm4sh_model_py.NudMaterial) -> bpy.types.Material:
     nodes.clear()
 
     bsdf = nodes.new("ShaderNodeBsdfPrincipled")
+    bsdf.location = (-300, 0)
 
     output_node = nodes.new("ShaderNodeOutputMaterial")
+    output_node.location = (0, 0)
 
     links.new(bsdf.outputs["BSDF"], output_node.inputs["Surface"])
 
     # TODO: Does preserving the order matter?
-    for prop in material.properties:
+    for i, prop in enumerate(material.properties):
         if prop.name != "NU_materialHash":
             # TODO: Custom node for xyzw values?
             node = nodes.new("ShaderNodeRGB")
+            node.location = (-500, i * -200)
+
             node.label = prop.name
             node.outputs[0].default_value = prop.values[:4]
 
     for i, texture in enumerate(material.textures):
-        # TODO: Create images ahead of time?
         node = nodes.new("ShaderNodeTexImage")
         node.label = str(i)
+        node.location = (-800, i * -300)
 
         # TODO: Load global textures like color ramps.
         image_name = f"{texture.hash:08X}"
