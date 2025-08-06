@@ -271,6 +271,16 @@ def import_material(material: sm4sh_model_py.NudMaterial) -> bpy.types.Material:
             image = bpy.data.images.new(image_name, 4, 4, alpha=True)
 
         node.image = image
+
+        # TODO: Error if U and V have the same wrap mode?
+        match texture.wrap_mode_s:
+            case sm4sh_model_py.WrapMode.Repeat:
+                node.extension = "REPEAT"
+            case sm4sh_model_py.WrapMode.MirroredRepeat:
+                node.extension = "MIRROR"
+            case sm4sh_model_py.WrapMode.ClampToEdge:
+                node.extension = "CLIP"
+
     return blender_material
 
 

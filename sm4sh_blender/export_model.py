@@ -404,9 +404,9 @@ def export_tangents(mesh_data, z_up_to_y_up, vertex_indices):
 
 
 def export_color_attribute(mesh_name, mesh_data, vertex_indices, color_attribute):
-    if color_attribute.name != "VertexColor":
+    if color_attribute.name != "Color":
         message = f'"{color_attribute.name}" for mesh {mesh_name} is not one of the supported color attribute names.'
-        message += ' Valid names are "VertexColor".'
+        message += ' Valid names are "Color".'
         raise ExportException(message)
 
     # TODO: error for unsupported data_type.
@@ -462,7 +462,7 @@ def export_material(material: bpy.types.Material) -> sm4sh_model_py.NudMaterial:
         cull_mode = value
 
     properties = []
-    texture_indices_hashes = []
+    texture_indices_textures = []
 
     # TODO: Does property order matter?
     for node in material.node_tree.nodes:
@@ -477,24 +477,35 @@ def export_material(material: bpy.types.Material) -> sm4sh_model_py.NudMaterial:
             texture_index = parse_int(node.label)
             if texture_index is not None:
                 if hash := parse_int(node.image.name, 16):
-                    texture_indices_hashes.append((texture_index, hash))
+                    # TODO: Preserve wrap mode for both U and V?
+                    wrap_s = sm4sh_model_py.WrapMode.ClampToEdge
+                    wrap_t = sm4sh_model_py.WrapMode.ClampToEdge
+                    match node.extension:
+                        case "REPEAT":
+                            wrap_s = sm4sh_model_py.WrapMode.Repeat
+                            wrap_t = sm4sh_model_py.WrapMode.Repeat
+                        case "CLIP":
+                            wrap_s = sm4sh_model_py.WrapMode.ClampToEdge
+                            wrap_t = sm4sh_model_py.WrapMode.ClampToEdge
+                        case "MIRROR":
+                            wrap_s = sm4sh_model_py.WrapMode.MirroredRepeat
+                            wrap_t = sm4sh_model_py.WrapMode.MirroredRepeat
+
+                    # TODO: investigate why texture mip settings can cause crashes.
+                    texture = sm4sh_model_py.NudTexture(
+                        hash,
+                        sm4sh_model_py.MapMode.TexCoord,
+                        wrap_s,
+                        wrap_t,
+                        sm4sh_model_py.MinFilter.Linear,
+                        sm4sh_model_py.MagFilter.Linear,
+                        sm4sh_model_py.MipDetail.OneMipLevelAnisotropicOff2,
+                    )
+                    texture_indices_textures.append((texture_index, texture))
 
     # The texture order matters.
-    texture_indices_hashes.sort(key=lambda x: x[0])
-    print(texture_indices_hashes)
-    textures = [
-        # TODO: investigate why texture mip settings can cause crashes.
-        sm4sh_model_py.NudTexture(
-            hash,
-            sm4sh_model_py.MapMode.TexCoord,
-            sm4sh_model_py.WrapMode.ClampToEdge,
-            sm4sh_model_py.WrapMode.ClampToEdge,
-            sm4sh_model_py.MinFilter.Linear,
-            sm4sh_model_py.MagFilter.Linear,
-            sm4sh_model_py.MipDetail.OneMipLevelAnisotropicOff2,
-        )
-        for _, hash in texture_indices_hashes
-    ]
+    texture_indices_textures.sort(key=lambda x: x[0])
+    textures = [texture for _, texture in texture_indices_textures]
 
     # The material hash property is always last.
     material_hash = 0.0
