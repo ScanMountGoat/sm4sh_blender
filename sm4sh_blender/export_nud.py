@@ -11,6 +11,7 @@ from sm4sh_blender.import_model import init_logging
 from .export_model import (
     ExportException,
     export_mesh,
+    extract_name,
 )
 
 from . import sm4sh_model_py
@@ -77,9 +78,9 @@ def export_nud(
     sorted_objects = [o for o in armature.children if o.type == "MESH"]
     sorted_objects.sort(key=lambda o: name_sort_index(o.name))
 
-    extract_name = lambda o: o.name.split("[")[0] if "[" in o.name else o.name
+    extract_object_name = lambda o: extract_name(o.name, ".")
 
-    for name, objects in itertools.groupby(sorted_objects, key=extract_name):
+    for name, objects in itertools.groupby(sorted_objects, key=extract_object_name):
         meshes_parent_indices = []
         for o in objects:
             mesh_parent_index = export_mesh(context, operator, o, bone_names)

@@ -1,7 +1,7 @@
 from typing import Optional, Tuple
 import bpy
 import math
-
+import struct
 from mathutils import Matrix
 from . import sm4sh_model_py
 import numpy as np
@@ -298,54 +298,36 @@ def export_mesh_inner(
     )
     vertices = sm4sh_model_py.vertex.Vertices(positions, normals, bones, colors, uvs)
 
-    # TODO: Set the material hash?
-    # TODO: investigate why texture mip settings can cause crashes.
-    material = sm4sh_model_py.NudMaterial(
-        0x94010161,
-        sm4sh_model_py.SrcFactor.One,
-        sm4sh_model_py.DstFactor.Zero,
-        sm4sh_model_py.AlphaFunc.Disabled,
-        sm4sh_model_py.CullMode.Inside,
-        [
-            sm4sh_model_py.NudTexture(
-                0x10080000,
-                sm4sh_model_py.MapMode.TexCoord,
-                sm4sh_model_py.WrapMode.ClampToEdge,
-                sm4sh_model_py.WrapMode.ClampToEdge,
-                sm4sh_model_py.MinFilter.Linear,
-                sm4sh_model_py.MagFilter.Linear,
-                sm4sh_model_py.MipDetail.OneMipLevelAnisotropicOff2,
-            ),
-            sm4sh_model_py.NudTexture(
-                0x10080000,
-                sm4sh_model_py.MapMode.TexCoord,
-                sm4sh_model_py.WrapMode.ClampToEdge,
-                sm4sh_model_py.WrapMode.ClampToEdge,
-                sm4sh_model_py.MinFilter.Linear,
-                sm4sh_model_py.MagFilter.Linear,
-                sm4sh_model_py.MipDetail.OneMipLevelAnisotropicOff2,
-            ),
-        ],
-        [
-            sm4sh_model_py.NudProperty("NU_colorSamplerUV", [1, 1, 0, 0]),
-            sm4sh_model_py.NudProperty("NU_fresnelColor", [1, 1, 1, 1]),
-            sm4sh_model_py.NudProperty("NU_blinkColor", [0, 0, 0, 0]),
-            sm4sh_model_py.NudProperty("NU_aoMinGain", [0, 0, 0, 0]),
-            sm4sh_model_py.NudProperty("NU_lightMapColorOffset", [0, 0, 0, 0]),
-            sm4sh_model_py.NudProperty("NU_fresnelParams", [1, 0, 0, 0]),
-            sm4sh_model_py.NudProperty("NU_alphaBlendParams", [0, 0, 0, 0]),
-            sm4sh_model_py.NudProperty("NU_materialHash", [0, 0, 0, 0]),
-        ],
-    )
+    material1 = None
+    material2 = None
+    material3 = None
+    material4 = None
+    for i, material in enumerate(mesh_data.materials):
+
+        if i == 0:
+            material1 = export_material(material)
+        elif i == 1:
+            material2 = export_material(material)
+        elif i == 2:
+            material3 = export_material(material)
+        elif i == 3:
+            material4 = export_material(material)
+        elif i > 3:
+            # TODO: Warning?
+            break
+
+    if material1 is None:
+        # TODO: warning?
+        material1 = default_material()
 
     mesh = sm4sh_model_py.NudMesh(
         vertices,
         vertex_indices,
         sm4sh_model_py.PrimitiveType.TriangleList,
-        material,
-        None,
-        None,
-        None,
+        material1,
+        material2,
+        material3,
+        material4,
     )
     return mesh, parent_bone_index
 
@@ -454,3 +436,151 @@ def export_uv_layer(mesh_data, positions, vertex_indices, uv_layer):
     uvs[:, 1] = 1.0 - uvs[:, 1]
 
     return uvs
+
+
+def export_material(material: bpy.types.Material) -> sm4sh_model_py.NudMaterial:
+    # TODO: Better error handling
+    flags = 0x94010161
+    flags_name = extract_name(material.name, ".")
+    if value := parse_int(flags_name, 16):
+        flags = value
+
+    src_factor = sm4sh_model_py.SrcFactor.One
+    if value := get_enum_value(material, "src_factor", sm4sh_model_py.SrcFactor):
+        src_factor = value
+
+    dst_factor = sm4sh_model_py.DstFactor.Zero
+    if value := get_enum_value(material, "dst_factor", sm4sh_model_py.DstFactor):
+        dst_factor = value
+
+    alpha_func = sm4sh_model_py.AlphaFunc.Disabled
+    if value := get_enum_value(material, "alpha_func", sm4sh_model_py.AlphaFunc):
+        alpha_func = value
+
+    cull_mode = sm4sh_model_py.CullMode.Inside
+    if value := get_enum_value(material, "cull_mode", sm4sh_model_py.CullMode):
+        cull_mode = value
+
+    properties = []
+    texture_indices_hashes = []
+
+    # TODO: Does property order matter?
+    for node in material.node_tree.nodes:
+        if node.label.startswith("NU_"):
+            try:
+                values = node.outputs[0].default_value
+            except:
+                values = [0, 0, 0, 0]
+
+            properties.append(sm4sh_model_py.NudProperty(node.label, values))
+        elif node.bl_idname == "ShaderNodeTexImage":
+            texture_index = parse_int(node.label)
+            if texture_index is not None:
+                if hash := parse_int(node.image.name, 16):
+                    texture_indices_hashes.append((texture_index, hash))
+
+    # The texture order matters.
+    texture_indices_hashes.sort(key=lambda x: x[0])
+    print(texture_indices_hashes)
+    textures = [
+        # TODO: investigate why texture mip settings can cause crashes.
+        sm4sh_model_py.NudTexture(
+            hash,
+            sm4sh_model_py.MapMode.TexCoord,
+            sm4sh_model_py.WrapMode.ClampToEdge,
+            sm4sh_model_py.WrapMode.ClampToEdge,
+            sm4sh_model_py.MinFilter.Linear,
+            sm4sh_model_py.MagFilter.Linear,
+            sm4sh_model_py.MipDetail.OneMipLevelAnisotropicOff2,
+        )
+        for _, hash in texture_indices_hashes
+    ]
+
+    # The material hash property is always last.
+    material_hash = 0.0
+    if hash := material.get("NU_materialHash"):
+        material_hash = float32_from_bits(int(hash, 16))
+
+    properties.append(
+        sm4sh_model_py.NudProperty("NU_materialHash", [material_hash, 0, 0, 0])
+    )
+
+    return sm4sh_model_py.NudMaterial(
+        flags,
+        src_factor,
+        dst_factor,
+        alpha_func,
+        cull_mode,
+        textures,
+        properties,
+    )
+
+
+def get_enum_value(material, name: str, enum):
+    if value := material.get(name):
+        try:
+            value = getattr(enum, value)
+            return value
+        except:
+            return None
+
+    return None
+
+
+def float32_from_bits(bits: int) -> float:
+    return struct.unpack("@f", struct.pack("@I", bits))[0]
+
+
+def parse_int(name: str, base=10) -> Optional[int]:
+    value = None
+    try:
+        value = int(name, base)
+    except:
+        value = None
+
+    return value
+
+
+def default_material() -> sm4sh_model_py.NudMaterial:
+    # TODO: investigate why texture mip settings can cause crashes.
+    return sm4sh_model_py.NudMaterial(
+        0x94010161,
+        sm4sh_model_py.SrcFactor.One,
+        sm4sh_model_py.DstFactor.Zero,
+        sm4sh_model_py.AlphaFunc.Disabled,
+        sm4sh_model_py.CullMode.Inside,
+        [
+            sm4sh_model_py.NudTexture(
+                0x10080000,
+                sm4sh_model_py.MapMode.TexCoord,
+                sm4sh_model_py.WrapMode.ClampToEdge,
+                sm4sh_model_py.WrapMode.ClampToEdge,
+                sm4sh_model_py.MinFilter.Linear,
+                sm4sh_model_py.MagFilter.Linear,
+                sm4sh_model_py.MipDetail.OneMipLevelAnisotropicOff2,
+            ),
+            sm4sh_model_py.NudTexture(
+                0x10080000,
+                sm4sh_model_py.MapMode.TexCoord,
+                sm4sh_model_py.WrapMode.ClampToEdge,
+                sm4sh_model_py.WrapMode.ClampToEdge,
+                sm4sh_model_py.MinFilter.Linear,
+                sm4sh_model_py.MagFilter.Linear,
+                sm4sh_model_py.MipDetail.OneMipLevelAnisotropicOff2,
+            ),
+        ],
+        [
+            sm4sh_model_py.NudProperty("NU_colorSamplerUV", [1, 1, 0, 0]),
+            sm4sh_model_py.NudProperty("NU_fresnelColor", [1, 1, 1, 1]),
+            sm4sh_model_py.NudProperty("NU_blinkColor", [0, 0, 0, 0]),
+            sm4sh_model_py.NudProperty("NU_aoMinGain", [0, 0, 0, 0]),
+            sm4sh_model_py.NudProperty("NU_lightMapColorOffset", [0, 0, 0, 0]),
+            sm4sh_model_py.NudProperty("NU_fresnelParams", [1, 0, 0, 0]),
+            sm4sh_model_py.NudProperty("NU_alphaBlendParams", [0, 0, 0, 0]),
+            sm4sh_model_py.NudProperty("NU_materialHash", [0, 0, 0, 0]),
+        ],
+    )
+
+
+def extract_name(name: str, separator: str) -> str:
+    return name.split(separator)[0] if separator in name else name

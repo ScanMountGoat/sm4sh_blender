@@ -3,9 +3,8 @@ from typing import Optional
 import bpy
 import numpy as np
 import math
-
+import struct
 from . import sm4sh_model_py
-
 from mathutils import Matrix
 
 
@@ -50,8 +49,9 @@ def import_mesh(
     armature: Optional[bpy.types.Object],
     bone_names: list[str],
 ):
-    name = group.name
-    blender_mesh = bpy.data.meshes.new(f"{name}[{i}]")
+    # Match Blender's naming conventions to preserve order for export.
+    name = f"{group.name}.{i:03}" if i > 0 else group.name
+    blender_mesh = bpy.data.meshes.new(name)
 
     indices = mesh.triangle_list_indices().astype(np.uint32)
 
@@ -223,10 +223,10 @@ def import_material(material: sm4sh_model_py.NudMaterial) -> bpy.types.Material:
     blender_material = bpy.data.materials.new(name)
 
     # Use custom properties to preserve values that are hard to represent in Blender.
-    blender_material["src_factor"] = str(material.src_factor).lstrip("SrcFactor.")
-    blender_material["dst_factor"] = str(material.dst_factor).lstrip("DstFactor.")
-    blender_material["alpha_func"] = str(material.alpha_func).lstrip("AlphaFunc.")
-    blender_material["cull_mode"] = str(material.cull_mode).lstrip("CullMode.")
+    blender_material["src_factor"] = str(material.src_factor).removeprefix("SrcFactor.")
+    blender_material["dst_factor"] = str(material.dst_factor).removeprefix("DstFactor.")
+    blender_material["alpha_func"] = str(material.alpha_func).removeprefix("AlphaFunc.")
+    blender_material["cull_mode"] = str(material.cull_mode).removeprefix("CullMode.")
 
     for prop in material.properties:
         if prop.name == "NU_materialHash":
@@ -268,9 +268,6 @@ def import_material(material: sm4sh_model_py.NudMaterial) -> bpy.types.Material:
 
         node.image = image
     return blender_material
-
-
-import struct
 
 
 def float32_bits(f: float) -> int:
