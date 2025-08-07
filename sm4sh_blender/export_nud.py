@@ -81,8 +81,9 @@ def export_nud(
         bone_names = [b.name for b in skeleton.bones]
 
     # TODO: Export images?
+    # TODO: Calculate better bounding sphere.
     groups = []
-    model = sm4sh_model_py.NudModel(groups, [], [0, 0, 0, 0], None)
+    model = sm4sh_model_py.NudModel(groups, [], [0, 0, 0, 10.0], None)
 
     # Use a consistent ordering since Blender collections don't have one.
     sorted_objects = [o for o in armature.children if o.type == "MESH"]
@@ -100,12 +101,13 @@ def export_nud(
         for parent_bone_index, meshes_parents in itertools.groupby(
             meshes_parent_indices, key=lambda o: o[1]
         ):
+            # TODO: Calculate better bounding sphere.
             meshes = [mesh for mesh, _ in meshes_parents]
             group = sm4sh_model_py.NudMeshGroup(
                 name,
                 meshes,
                 0.0,
-                [0, 0, 0, 0],
+                [0, 0, 0, 10.0],
                 parent_bone_index,
             )
             groups.append(group)
