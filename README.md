@@ -1,7 +1,7 @@
 # sm4sh_blender [![GitHub release (latest by date including pre-releases)](https://img.shields.io/github/v/release/ScanMountGoat/sm4sh_blender?include_prereleases)](https://github.com/ScanMountGoat/sm4sh_blender/releases/latest) [![wiki](https://img.shields.io/badge/wiki-guide-success)](https://github.com/scanmountgoat/sm4sh_blender/wiki)
 A Blender addon for importing and exporting models and animations for Smash 4 for Wii U.
 
-Report bugs or request new features in [issues](https://github.com/ScanMountGoat/sm4sh_blender/issues). Check the [wiki](https://github.com/ScanMountGoat/sm4sh_blender/wiki) for more usage information.
+Report bugs or request new features in [issues](https://github.com/ScanMountGoat/sm4sh_blender/issues). Download the latest version from [releases](https://github.com/ScanMountGoat/sm4sh_blender/releases). Check the [wiki](https://github.com/ScanMountGoat/sm4sh_blender/wiki) for more usage information.
 
 ## Getting Started
 * Download the latest version of the addon supported by your Blender version from [releases](https://github.com/ScanMountGoat/sm4sh_blender/releases).
