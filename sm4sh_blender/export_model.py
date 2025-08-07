@@ -283,7 +283,7 @@ def export_mesh_inner(
 
     uvs = sm4sh_model_py.vertex.Uvs.from_uvs_float16(uv_layers)
 
-    float_colors = np.ones((positions.shape[0], 4), dtype=np.uint8) * 0.5
+    float_colors = np.ones((positions.shape[0], 4), dtype=np.float32) * 0.5
     for color_attribute in mesh_data.color_attributes:
         if color_attribute.name == "Color":
             float_colors = export_color_attribute(
