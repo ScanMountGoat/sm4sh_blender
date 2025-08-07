@@ -65,29 +65,36 @@ def export_nud(
 ):
     start = time.time()
 
-    armature = context.object
-    if armature is None or not isinstance(armature.data, bpy.types.Armature):
-        operator.report({"ERROR"}, "No armature selected")
-        return
+    sorted_objects = []
+    if len(context.selected_objects) == 1:
+        if original_nud_path == "":
+            original_nud_path = context.selected_objects[0].get("original_nud")
 
-    if original_nud_path == "":
-        original_nud_path = armature.get("original_nud")
+        sorted_objects = [
+            o for o in context.selected_objects[0].children if o.type == "MESH"
+        ]
+    else:
+        sorted_objects = [o for o in context.selected_objects if o.type == "MESH"]
 
-    original_model = sm4sh_model_py.load_model(original_nud_path)
+    # Use a consistent ordering since Blender collections don't have one.
+    sorted_objects.sort(key=lambda o: name_sort_index(o.name))
+
+    try:
+        original_model = sm4sh_model_py.load_model(original_nud_path)
+    except:
+        message = f'Unable to load original nud from "{original_nud_path}". Exports may cause issues in game.'
+        operator.report({"WARNING"}, message)
+        original_model = None
 
     # Preserve the original bone order since armatures don't preserve bone order.
     bone_names = []
-    if skeleton := original_model.skeleton:
-        bone_names = [b.name for b in skeleton.bones]
+    if original_model is not None and original_model.skeleton is not None:
+        bone_names = [b.name for b in original_model.skeleton.bones]
 
     # TODO: Export images?
     # TODO: Calculate better bounding sphere.
     groups = []
     model = sm4sh_model_py.NudModel(groups, [], [0, 0, 0, 10.0], None)
-
-    # Use a consistent ordering since Blender collections don't have one.
-    sorted_objects = [o for o in armature.children if o.type == "MESH"]
-    sorted_objects.sort(key=lambda o: name_sort_index(o.name))
 
     extract_object_name = lambda o: extract_name(o.name, ".")
 
@@ -113,8 +120,9 @@ def export_nud(
             groups.append(group)
 
     # Preserve the order of the original groups with new groups at the end.
-    name_pos = {g.name: i for i, g in enumerate(original_model.groups)}
-    groups.sort(key=lambda g: name_pos.get(g.name, 0xFFFFFFFF))
+    if original_model is not None:
+        name_pos = {g.name: i for i, g in enumerate(original_model.groups)}
+        groups.sort(key=lambda g: name_pos.get(g.name, 0xFFFFFFFF))
 
     end = time.time()
     print(f"Create NudModel: {end - start}")
