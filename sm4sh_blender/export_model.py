@@ -259,6 +259,11 @@ def export_mesh_inner(
     bones = None
 
     influences = export_influences(blender_mesh, mesh_data)
+    for influence in influences:
+        if influence.bone_name not in bone_names:
+            message = f"Vertex group {influence.bone_name} for mesh {mesh_name} is not in the vbn bone list."
+            raise ExportException(message)
+
     if len(influences) > 1:
         skin_weights = sm4sh_model_py.skinning.SkinWeights.from_influences(
             influences, positions.shape[0], bone_names
