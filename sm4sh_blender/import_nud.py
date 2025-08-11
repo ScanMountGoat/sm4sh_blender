@@ -2,6 +2,7 @@ import bpy
 import time
 
 from .import_model import (
+    ImportException,
     import_nud_model,
     init_logging,
 )
@@ -47,10 +48,14 @@ class ImportNud(bpy.types.Operator, ImportHelper):
 
         start = time.time()
 
-        armature = import_nud_model(self, context, model)
-        if armature is not None:
-            # Store the path to make exporting easier later.
-            armature["original_nud"] = path
+        try:
+            armature = import_nud_model(self, context, model)
+            if armature is not None:
+                # Store the path to make exporting easier later.
+                armature["original_nud"] = path
+        except ImportException as e:
+            self.report({"ERROR"}, str(e))
 
         end = time.time()
         print(f"Import Blender Scene: {end - start}")
+        return {"FINISHED"}

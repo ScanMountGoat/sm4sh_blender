@@ -8,6 +8,10 @@ from . import sm4sh_model_py
 from mathutils import Matrix
 
 
+class ImportException(Exception):
+    pass
+
+
 def init_logging():
     # Log any errors from Rust.
     log_fmt = "%(levelname)s %(name)s %(filename)s:%(lineno)d %(message)s"
@@ -110,13 +114,16 @@ def import_mesh(
         modifier.object = armature
 
     if parent_bone_index := group.parent_bone_index:
+        if parent_bone_index >= len(bone_names):
+            message = f"{group.name} parent bone index {group.parent_bone_index} is out of range for {len(bone_names)} bones."
+            raise ImportException(message)
+
         # Convert bone parenting to vertex weights.
         parent_bone_name = bone_names[parent_bone_index]
         vertex_group = obj.vertex_groups.new(name=parent_bone_name)
         vertex_group.add(indices.tolist(), 1.0, "REPLACE")
-    else:
-        if bones := mesh.vertices.bones:
-            import_weight_groups(obj, bones.bone_indices, bones.weights, bone_names)
+    elif bones := mesh.vertices.bones:
+        import_weight_groups(obj, bones.bone_indices, bones.weights, bone_names)
 
     collection.objects.link(obj)
 
