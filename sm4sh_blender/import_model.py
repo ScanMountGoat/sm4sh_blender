@@ -22,6 +22,7 @@ def import_nud_model(
     operator,
     context,
     model: sm4sh_model_py.NudModel,
+    database: sm4sh_model_py.database.ShaderDatabase,
 ) -> Optional[bpy.types.Object]:
     # These images will be referenced later by name.
     # TODO: Check for duplicates?
@@ -38,7 +39,14 @@ def import_nud_model(
     for group in model.groups:
         for i, mesh in enumerate(group.meshes):
             import_mesh(
-                operator, context.collection, group, mesh, i, armature, bone_names
+                operator,
+                context.collection,
+                group,
+                mesh,
+                i,
+                armature,
+                bone_names,
+                database,
             )
 
     return armature
@@ -52,6 +60,7 @@ def import_mesh(
     i: int,
     armature: Optional[bpy.types.Object],
     bone_names: list[str],
+    database: sm4sh_model_py.database.ShaderDatabase,
 ):
     # Match Blender's naming conventions to preserve order for export.
     name = f"{group.name}.{i:03}" if i > 0 else group.name
@@ -98,13 +107,13 @@ def import_mesh(
     blender_mesh.transform(y_up_to_z_up)
 
     if material := mesh.material1:
-        blender_mesh.materials.append(import_material(material))
+        blender_mesh.materials.append(import_material(material, database))
     if material := mesh.material2:
-        blender_mesh.materials.append(import_material(material))
+        blender_mesh.materials.append(import_material(material, database))
     if material := mesh.material3:
-        blender_mesh.materials.append(import_material(material))
+        blender_mesh.materials.append(import_material(material, database))
     if material := mesh.material4:
-        blender_mesh.materials.append(import_material(material))
+        blender_mesh.materials.append(import_material(material, database))
 
     obj = bpy.data.objects.new(blender_mesh.name, blender_mesh)
 
@@ -225,8 +234,11 @@ def import_weight_groups(
                 group.add([weight.vertex_index], weight.weight, "REPLACE")
 
 
-def import_material(material: sm4sh_model_py.NudMaterial) -> bpy.types.Material:
-    name = f"{material.flags:08X}"
+def import_material(
+    material: sm4sh_model_py.NudMaterial,
+    database: sm4sh_model_py.database.ShaderDatabase,
+) -> bpy.types.Material:
+    name = f"{material.shader_id:08X}"
     blender_material = bpy.data.materials.new(name)
 
     # Use custom properties to preserve values that are hard to represent in Blender.
@@ -256,7 +268,7 @@ def import_material(material: sm4sh_model_py.NudMaterial) -> bpy.types.Material:
 
     links.new(bsdf.outputs["BSDF"], output_node.inputs["Surface"])
 
-    # TODO: Does preserving the order matter?
+    # TODO: Does preserving the property order matter?
     for i, prop in enumerate(material.properties):
         if prop.name != "NU_materialHash":
             # TODO: Custom node for xyzw values?
@@ -266,6 +278,7 @@ def import_material(material: sm4sh_model_py.NudMaterial) -> bpy.types.Material:
             node.label = prop.name
             node.outputs[0].default_value = prop.values[:4]
 
+    texture_nodes = []
     for i, texture in enumerate(material.textures):
         node = nodes.new("ShaderNodeTexImage")
         node.label = str(i)
@@ -287,6 +300,27 @@ def import_material(material: sm4sh_model_py.NudMaterial) -> bpy.types.Material:
                 node.extension = "MIRROR"
             case sm4sh_model_py.WrapMode.ClampToEdge:
                 node.extension = "CLIP"
+
+        texture_nodes.append(node)
+
+    # Texture usage is determined by the compiled shaders.
+    # TODO: Generate shader nodes based on compiled code similar to xenoblade_blender.
+    if shader := database.get_shader(material.shader_id):
+        for name, node in zip(shader.samplers.values(), texture_nodes):
+            match name:
+                case "colorSampler":
+                    # TODO: Is this gamma handling part of the compiled shader code?
+                    node.image.colorspace_settings.name = "sRGB"
+                    links.new(node.outputs["Color"], bsdf.inputs["Base Color"])
+                case "normalSampler":
+                    normal = nodes.new("ShaderNodeNormalMap")
+                    normal.location = (-300, -400)
+                    links.new(node.outputs["Color"], normal.inputs["Color"])
+                    links.new(normal.outputs["Normal"], bsdf.inputs["Normal"])
+                case "reflectionSampler":
+                    pass
+                case "reflectionCubeSampler":
+                    pass
 
     return blender_material
 

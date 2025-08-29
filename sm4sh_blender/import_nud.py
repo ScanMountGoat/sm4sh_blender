@@ -1,5 +1,6 @@
 import bpy
 import time
+import os
 
 from .import_model import (
     ImportException,
@@ -43,13 +44,16 @@ class ImportNud(bpy.types.Operator, ImportHelper):
 
         model = sm4sh_model_py.load_model(path)
 
+        database_path = os.path.join(os.path.dirname(__file__), "shaders.json")
+        database = sm4sh_model_py.database.ShaderDatabase.from_file(database_path)
+
         end = time.time()
         print(f"Load Model: {end - start}")
 
         start = time.time()
 
         try:
-            armature = import_nud_model(self, context, model)
+            armature = import_nud_model(self, context, model, database)
             if armature is not None:
                 # Store the path to make exporting easier later.
                 armature["original_nud"] = path
