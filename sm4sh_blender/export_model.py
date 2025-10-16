@@ -521,11 +521,13 @@ def export_material(material: bpy.types.Material) -> sm4sh_model_py.NudMaterial:
         sm4sh_model_py.NudProperty("NU_materialHash", [material_hash, 0, 0, 0])
     )
 
+    alpha_ref = 0
     return sm4sh_model_py.NudMaterial(
         flags,
         src_factor,
         dst_factor,
         alpha_func,
+        alpha_ref,
         cull_mode,
         textures,
         properties,
