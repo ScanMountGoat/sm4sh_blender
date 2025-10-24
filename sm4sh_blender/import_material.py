@@ -97,7 +97,9 @@ def import_material(
         expr_outputs = []
         for i, expr in enumerate(shader.exprs):
             # TODO: Get the values for shared uniform buffers.
-            node_output = assign_output(expr, expr_outputs, nodes, links, textures)
+            node_output = assign_output(
+                shader, expr, expr_outputs, nodes, links, textures
+            )
             expr_outputs.append(node_output)
 
         output_color = nodes.new("ShaderNodeCombineColor")
@@ -196,6 +198,7 @@ def assign_normal_map(
 
 
 def assign_output(
+    shader: sm4sh_model_py.database.ShaderProgram,
     expr: sm4sh_model_py.database.OutputExpr,
     expr_outputs: list[Optional[Tuple[bpy.types.Node, str]]],
     nodes,
@@ -330,7 +333,7 @@ def assign_output(
                 # TODO: This case shouldn't happen?
                 return None
     elif value := expr.value():
-        return assign_value(value, expr_outputs, nodes, links, textures)
+        return assign_value(shader, value, expr_outputs, nodes, links, textures)
     else:
         return None
 
@@ -352,6 +355,7 @@ def assign_index(
 
 
 def assign_value(
+    shader: sm4sh_model_py.database.ShaderProgram,
     value: sm4sh_model_py.database.Value,
     expr_outputs: list[Optional[Tuple[bpy.types.Node, str]]],
     nodes,
@@ -367,7 +371,7 @@ def assign_value(
         node.outputs[0].default_value = f
         return node, "Value"
     elif parameter := value.parameter():
-        return assign_parameter(parameter, nodes, links)
+        return assign_parameter(shader, parameter, nodes, links)
     elif attribute := value.attribute():
         return assign_attribute(attribute, nodes, links)
     elif texture := value.texture():
@@ -385,14 +389,26 @@ def assign_float(output, f):
 
 
 def assign_parameter(
-    parameter: sm4sh_model_py.database.Parameter, nodes, links
+    shader: sm4sh_model_py.database.ShaderProgram,
+    parameter: sm4sh_model_py.database.Parameter,
+    nodes,
+    links,
 ) -> Optional[Tuple[bpy.types.Node, str]]:
     # TODO: Is there an easy way to support all the global parameters?
-    if parameter.name == "MC":
+    if parameter.name == "MC" or parameter.name == "MC_EFFECT":
         name = f"NU_{parameter.field}"
         if node := nodes.get(name):
             # NU_ nodes use a custom node group for RGBA channel support.
             return node, channel_name(parameter.channel)
+
+    else:
+        value = shader.parameter_value(parameter)
+        if value is not None:
+            node = nodes.new("ShaderNodeValue")
+            # TODO: add the Rust display impl to python?
+            node.label = f"{parameter.name}.{parameter.field}.{parameter.channel}"
+            node.outputs[0].default_value = value
+            return node, "Value"
 
     return None
 
@@ -544,6 +560,7 @@ def import_attribute(name: str, nodes) -> bpy.types.Node:
         node = nodes.new("ShaderNodeAttribute")
         node.name = name
 
+        # TODO: Use normal map node red, green, blue to get TBN vectors
         match name:
             case "a_Position":
                 node.attribute_name = "position"
