@@ -89,7 +89,7 @@ def import_material(
     shader = database.get_shader(material.shader_id)
     if shader is not None:
         textures = {}
-        for name, node in zip(texture_nodes, shader.samplers):
+        for name, node in zip(shader.samplers, texture_nodes):
             textures[name] = node
 
         # Create nodes for each unique assignment.
@@ -294,7 +294,9 @@ def assign_output(
                 node.inputs[1].default_value = 2.0
 
                 return node, "Value"
-            # TODO: fract, intbitstofloat, floatbitstoint
+            case sm4sh_model_py.database.Operation.Fract:
+                return mix_rgba_node("FRACT")
+            # TODO: intbitstofloat, floatbitstoint
 
             case sm4sh_model_py.database.Operation.Select:
                 return mix_rgba_node("MIX")
@@ -470,8 +472,7 @@ def assign_texture(
 
     # Don't use the above name for node caching for any of the texture nodes.
     # This ensures the correct channel is assigned for each assignment.
-    rgba_name = f"{name}.rgba"
-    node = textures.get(name)
+    node = textures.get(texture.name)
     if node is not None:
         assign_uvs(texture.texcoords, expr_outputs, node, nodes, links)
         return assign_channel(name, texture.channel, node, nodes, links)
@@ -543,19 +544,20 @@ def import_attribute(name: str, nodes) -> bpy.types.Node:
         node = nodes.new("ShaderNodeAttribute")
         node.name = name
 
-        if name == "vPos":
-            node.attribute_name = "position"
-        elif name == "vNormal":
-            node.attribute_name = "VertexNormal"
-        elif name == "vColor":
-            node.attribute_name = "VertexColor"
-        elif name == "vBlend":
-            node.attribute_name = "Blend"
-        else:
-            for i in range(9):
-                if name == f"vTex{i}":
-                    node.attribute_name = f"TexCoord{i}"
-                    break
+        match name:
+            case "a_Position":
+                node.attribute_name = "position"
+            case "a_Normal":
+                node.attribute_name = "VertexNormal"
+            case "a_Color":
+                node.attribute_name = "Color"
+            case "a_TexCoord0":
+                node.attribute_name = "UV0"
+            case "a_TexCoord1":
+                node.attribute_name = "UV1"
+            case "a_TexCoord2":
+                node.attribute_name = "UV2"
+
     return node
 
 
