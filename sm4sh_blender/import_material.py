@@ -3,21 +3,10 @@ import bpy
 import typing
 import struct
 
-from xenoblade_blender.node_group import (
-    add_normals_node_group,
-    clamp_xyz_node_group,
+from sm4sh_blender.node_group import (
     create_node_group,
-    fresnel_blend_node_group,
-    greater_xyz_node_group,
-    less_xyz_node_group,
-    normal_map_xy_final_node_group,
-    normal_map_xyz_node_group,
-    power_xyz_node_group,
-    reflect_xyz_node_group,
-    sqrt_xyz_node_group,
-    tex_matrix_node_group,
-    tex_parallax_node_group,
-    toon_grad_uvs_node_group,
+    dot4_node_group,
+    rgba_color_node_group,
 )
 from sm4sh_blender.node_layout import layout_nodes
 
@@ -61,12 +50,16 @@ def import_material(
     # TODO: Does preserving the property order matter?
     for i, prop in enumerate(material.properties):
         if prop.name != "NU_materialHash":
-            # TODO: Custom node for xyzw values?
-            node = nodes.new("ShaderNodeRGB")
-            node.location = (-500, i * -200)
-
+            node = create_node_group(nodes, "RgbaColor", rgba_color_node_group)
+            node.name = prop.name
             node.label = prop.name
-            node.outputs[0].default_value = prop.values[:4]
+            node.inputs["Color"].default_value = [
+                prop.values[0],
+                prop.values[1],
+                prop.values[2],
+                1.0,
+            ]
+            node.inputs["Alpha"].default_value = prop.values[3]
 
     texture_nodes = []
     for i, texture in enumerate(material.textures):
@@ -261,18 +254,59 @@ def assign_output(
             case sm4sh_model_py.database.Operation.Sqrt:
                 return math_node("SQRT")
             case sm4sh_model_py.database.Operation.InverseSqrt:
-                pass  # TODO: InverseSqrt
+                return math_node("INVERSE_SQRT")
             case sm4sh_model_py.database.Operation.Fma:
                 return math_node("MULTIPLY_ADD")
             case sm4sh_model_py.database.Operation.Dot4:
-                pass  # TODO: Dot4
-            # TODO: sin, cos, exp2, log2, fract, intbitstofloat, floatbitstoint
+                node = create_node_group(nodes, "Dot4", dot4_node_group)
+                node.name = func_name(func)
+
+                assign_arg(func.args[0], node.inputs["A.x"])
+                assign_arg(func.args[1], node.inputs["A.y"])
+                assign_arg(func.args[2], node.inputs["A.z"])
+                assign_arg(func.args[3], node.inputs["A.w"])
+
+                assign_arg(func.args[4], node.inputs["B.x"])
+                assign_arg(func.args[5], node.inputs["B.y"])
+                assign_arg(func.args[6], node.inputs["B.z"])
+                assign_arg(func.args[7], node.inputs["B.w"])
+
+                return node, "Value"
+            case sm4sh_model_py.database.Operation.Sin:
+                return math_node("SINE")
+            case sm4sh_model_py.database.Operation.Cos:
+                return math_node("COSINE")
+            case sm4sh_model_py.database.Operation.Exp2:
+                node = nodes.new("ShaderNodeMath")
+                node.name = func_name(func)
+                node.operation = "POWER"
+
+                node.inputs[0].default_value = 2.0
+                assign_arg(func.args[0], node.inputs[1])
+
+                return node, "Value"
+            case sm4sh_model_py.database.Operation.Log2:
+                node = nodes.new("ShaderNodeMath")
+                node.name = func_name(func)
+                node.operation = "LOGARITHM"
+
+                assign_arg(func.args[0], node.inputs[0])
+                node.inputs[1].default_value = 2.0
+
+                return node, "Value"
+            # TODO: fract, intbitstofloat, floatbitstoint
 
             case sm4sh_model_py.database.Operation.Select:
                 return mix_rgba_node("MIX")
+            case sm4sh_model_py.database.Operation.Negate:
+                node = nodes.new("ShaderNodeMath")
+                node.name = func_name(func)
+                node.operation = "MULTIPLY"
 
-            # TODO: negate
+                assign_arg(func.args[0], node.inputs[0])
+                node.inputs[1].default_value = -1.0
 
+                return node, "Value"
             case sm4sh_model_py.database.Operation.Equal:
                 return math_node("COMPARE")
             case sm4sh_model_py.database.Operation.NotEqual:
@@ -322,10 +356,16 @@ def assign_value(
     links,
     textures,
 ) -> Optional[Tuple[bpy.types.Node, str]]:
-    if f := value.float():
+    if i := value.int():
+        node = nodes.new("ShaderNodeValue")
+        node.outputs[0].default_value = i
+        return node, "Value"
+    elif f := value.float():
         node = nodes.new("ShaderNodeValue")
         node.outputs[0].default_value = f
         return node, "Value"
+    elif parameter := value.parameter():
+        return assign_parameter(parameter, nodes, links)
     elif attribute := value.attribute():
         return assign_attribute(attribute, nodes, links)
     elif texture := value.texture():
@@ -340,6 +380,19 @@ def assign_float(output, f):
         output.default_value = [f] * len(output.default_value)
     except:
         output.default_value = f
+
+
+def assign_parameter(
+    parameter: sm4sh_model_py.database.Parameter, nodes, links
+) -> Optional[Tuple[bpy.types.Node, str]]:
+    # TODO: Is there an easy way to support all the global parameters?
+    if parameter.name == "MC":
+        name = f"NU_{parameter.field}"
+        if node := nodes.get(name):
+            # NU_ nodes use a custom node group for RGBA channel support.
+            return node, channel_name(parameter.channel)
+
+    return None
 
 
 def assign_attribute(
