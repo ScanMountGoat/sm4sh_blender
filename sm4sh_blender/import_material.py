@@ -6,6 +6,8 @@ import struct
 from sm4sh_blender.node_group import (
     create_node_group,
     dot4_node_group,
+    normal_map_xyz_node_group,
+    normalize_xyz_node_group,
     rgba_color_node_group,
 )
 from sm4sh_blender.node_layout import layout_nodes
@@ -327,6 +329,96 @@ def assign_output(
             case sm4sh_model_py.database.Operation.GreaterEqual:
                 # TODO: node group for geq?
                 return math_node("GREATER_THAN")
+            case sm4sh_model_py.database.Operation.NormalMapX:
+                # Reuse the node for other channels if possible.
+                name = func_name(func)
+                node = nodes.get(name)
+                if node is None:
+                    node = create_node_group(
+                        nodes, "NormalMapXYZ", normal_map_xyz_node_group
+                    )
+                    node.name = func_name(func)
+
+                assign_arg(func.args[0], node.inputs["X"])
+                assign_arg(func.args[1], node.inputs["Y"])
+                assign_arg(func.args[2], node.inputs["Z"])
+
+                return node, "X"
+            case sm4sh_model_py.database.Operation.NormalMapY:
+                # Reuse the node for other channels if possible.
+                name = func_name(func)
+                node = nodes.get(name)
+                if node is None:
+                    node = create_node_group(
+                        nodes, "NormalMapXYZ", normal_map_xyz_node_group
+                    )
+                    node.name = func_name(func)
+
+                assign_arg(func.args[0], node.inputs["X"])
+                assign_arg(func.args[1], node.inputs["Y"])
+                assign_arg(func.args[2], node.inputs["Z"])
+
+                return node, "Y"
+            case sm4sh_model_py.database.Operation.NormalMapZ:
+                # Reuse the node for other channels if possible.
+                name = func_name(func)
+                node = nodes.get(name)
+                if node is None:
+                    node = create_node_group(
+                        nodes, "NormalMapXYZ", normal_map_xyz_node_group
+                    )
+                    node.name = func_name(func)
+
+                assign_arg(func.args[0], node.inputs["X"])
+                assign_arg(func.args[1], node.inputs["Y"])
+                assign_arg(func.args[2], node.inputs["Z"])
+
+                return node, "Z"
+            case sm4sh_model_py.database.Operation.NormalizeX:
+                # Reuse the node for other channels if possible.
+                name = func_name(func)
+                node = nodes.get(name)
+                if node is None:
+                    node = create_node_group(
+                        nodes, "NormalizeXYZ", normalize_xyz_node_group
+                    )
+                    node.name = func_name(func)
+
+                assign_arg(func.args[0], node.inputs["X"])
+                assign_arg(func.args[1], node.inputs["Y"])
+                assign_arg(func.args[2], node.inputs["Z"])
+
+                return node, "X"
+            case sm4sh_model_py.database.Operation.NormalizeY:
+                # Reuse the node for other channels if possible.
+                name = func_name(func)
+                node = nodes.get(name)
+                if node is None:
+                    node = create_node_group(
+                        nodes, "NormalizeXYZ", normalize_xyz_node_group
+                    )
+                    node.name = func_name(func)
+
+                assign_arg(func.args[0], node.inputs["X"])
+                assign_arg(func.args[1], node.inputs["Y"])
+                assign_arg(func.args[2], node.inputs["Z"])
+
+                return node, "Y"
+            case sm4sh_model_py.database.Operation.NormalizeZ:
+                # Reuse the node for other channels if possible.
+                name = func_name(func)
+                node = nodes.get(name)
+                if node is None:
+                    node = create_node_group(
+                        nodes, "NormalizeXYZ", normalize_xyz_node_group
+                    )
+                    node.name = func_name(func)
+
+                assign_arg(func.args[0], node.inputs["X"])
+                assign_arg(func.args[1], node.inputs["Y"])
+                assign_arg(func.args[2], node.inputs["Z"])
+
+                return node, "Z"
             case sm4sh_model_py.database.Operation.Unk:
                 return None
             case _:
@@ -544,6 +636,20 @@ def func_name(func: sm4sh_model_py.database.OutputExprFunc):
 
 def func_name_inner(op: sm4sh_model_py.database.Operation, args: list[int]):
     op_name = str(op).removeprefix("Operation.")
+    # Node groups that have multiple outputs can share a node.
+    replacements = [
+        ("NormalizeX", "Normalize"),
+        ("NormalizeY", "Normalize"),
+        ("NormalizeZ", "Normalize"),
+        ("NormalMapX", "NormalMap"),
+        ("NormalMapY", "NormalMap"),
+        ("NormalMapZ", "NormalMap"),
+    ]
+    for old, new in replacements:
+        if op_name.startswith(old):
+            op_name = op_name.replace(old, new)
+            break
+
     func_args = ", ".join(str(a) for a in args)
     name = f"{op_name}({func_args})"
     return name

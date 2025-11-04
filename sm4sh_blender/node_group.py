@@ -121,3 +121,100 @@ def dot4_node_group():
     layout_nodes(output_node, links)
 
     return node_tree
+
+
+def normal_map_xyz_node_group():
+    node_tree = bpy.data.node_groups.new("NormalMapXYZ", "ShaderNodeTree")
+
+    node_tree.interface.new_socket(
+        in_out="OUTPUT", socket_type="NodeSocketFloat", name="X"
+    )
+    node_tree.interface.new_socket(
+        in_out="OUTPUT", socket_type="NodeSocketFloat", name="Y"
+    )
+    node_tree.interface.new_socket(
+        in_out="OUTPUT", socket_type="NodeSocketFloat", name="Z"
+    )
+
+    nodes = node_tree.nodes
+    links = node_tree.links
+
+    input_node = nodes.new("NodeGroupInput")
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="X"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="Y"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="Z"
+    )
+
+    normals = nodes.new("ShaderNodeCombineXYZ")
+    links.new(input_node.outputs["X"], normals.inputs["X"])
+    links.new(input_node.outputs["Y"], normals.inputs["Y"])
+    links.new(input_node.outputs["Z"], normals.inputs["Z"])
+
+    normal_map = nodes.new("ShaderNodeNormalMap")
+    links.new(normals.outputs["Vector"], normal_map.inputs["Color"])
+
+    xyz = nodes.new("ShaderNodeSeparateXYZ")
+    links.new(normal_map.outputs["Normal"], xyz.inputs["Vector"])
+
+    output_node = nodes.new("NodeGroupOutput")
+    links.new(xyz.outputs["X"], output_node.inputs["X"])
+    links.new(xyz.outputs["Y"], output_node.inputs["Y"])
+    links.new(xyz.outputs["Z"], output_node.inputs["Z"])
+
+    layout_nodes(output_node, links)
+
+    return node_tree
+
+
+def normalize_xyz_node_group():
+    node_tree = bpy.data.node_groups.new("NormalizeXYZ", "ShaderNodeTree")
+
+    node_tree.interface.new_socket(
+        in_out="OUTPUT", socket_type="NodeSocketFloat", name="X"
+    )
+    node_tree.interface.new_socket(
+        in_out="OUTPUT", socket_type="NodeSocketFloat", name="Y"
+    )
+    node_tree.interface.new_socket(
+        in_out="OUTPUT", socket_type="NodeSocketFloat", name="Z"
+    )
+
+    nodes = node_tree.nodes
+    links = node_tree.links
+
+    input_node = nodes.new("NodeGroupInput")
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="X"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="Y"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="Z"
+    )
+
+    input_value = nodes.new("ShaderNodeCombineXYZ")
+    links.new(input_node.outputs["X"], input_value.inputs["X"])
+    links.new(input_node.outputs["Y"], input_value.inputs["Y"])
+    links.new(input_node.outputs["Z"], input_value.inputs["Z"])
+
+    normalize = nodes.new("ShaderNodeVectorMath")
+    normalize.operation = "NORMALIZE"
+    links.new(input_value.outputs["Vector"], normalize.inputs[0])
+
+    output_value = nodes.new("ShaderNodeSeparateXYZ")
+    links.new(normalize.outputs["Vector"], output_value.inputs["Vector"])
+
+    output_node = nodes.new("NodeGroupOutput")
+    links.new(output_value.outputs["X"], output_node.inputs["X"])
+    links.new(output_value.outputs["Y"], output_node.inputs["Y"])
+    links.new(output_value.outputs["Z"], output_node.inputs["Z"])
+
+    layout_nodes(output_node, links)
+
+    return node_tree
