@@ -22,19 +22,32 @@ def import_material(
     material: sm4sh_model_py.NudMaterial,
     database: sm4sh_model_py.database.ShaderDatabase,
 ) -> bpy.types.Material:
+    # Blender doesn't support material instances that differ only by property and texture values.
+    # Creating nodes that recreate the in game shader code is very expensive.
+    # Copying an existing material to use as a base still gives a substantial speedup.
+    name = f"{material.shader_id:08X}"
+    base_material = bpy.data.materials.get(name)
+    shader = database.get_shader(material.shader_id)
+
+    if base_material is not None:
+        blender_material = base_material.copy()
+    else:
+        blender_material = create_material(material, shader)
+
+    # Apply the material specific values for this "instance" of the shader.
+    # TODO: Update values even if shader is missing to still support material editing.
+    if shader is not None:
+        update_material(blender_material, material, shader)
+
+    return blender_material
+
+
+def create_material(
+    material: sm4sh_model_py.NudMaterial,
+    shader: Optional[sm4sh_model_py.database.ShaderProgram],
+) -> bpy.types.Material:
     name = f"{material.shader_id:08X}"
     blender_material = bpy.data.materials.new(name)
-
-    # Use custom properties to preserve values that are hard to represent in Blender.
-    blender_material["src_factor"] = str(material.src_factor).removeprefix("SrcFactor.")
-    blender_material["dst_factor"] = str(material.dst_factor).removeprefix("DstFactor.")
-    blender_material["alpha_func"] = str(material.alpha_func).removeprefix("AlphaFunc.")
-    blender_material["cull_mode"] = str(material.cull_mode).removeprefix("CullMode.")
-
-    for prop in material.properties:
-        if prop.name == "NU_materialHash":
-            material_hash = float32_bits(prop.values[0])
-            blender_material["NU_materialHash"] = f"{material_hash:08X}"
 
     blender_material.use_nodes = True
     nodes = blender_material.node_tree.nodes
@@ -49,47 +62,23 @@ def import_material(
     final_emission = nodes.new("ShaderNodeEmission")
     links.new(final_emission.outputs["Emission"], output_node.inputs["Surface"])
 
-    # TODO: Does preserving the property order matter?
-    for i, prop in enumerate(material.properties):
-        if prop.name != "NU_materialHash":
-            node = create_node_group(nodes, "RgbaColor", rgba_color_node_group)
-            node.name = prop.name
-            node.label = prop.name
-            node.inputs["Color"].default_value = [
-                prop.values[0],
-                prop.values[1],
-                prop.values[2],
-                1.0,
-            ]
-            node.inputs["Alpha"].default_value = prop.values[3]
-
-    texture_nodes = []
-    for i, texture in enumerate(material.textures):
-        node = nodes.new("ShaderNodeTexImage")
-        node.label = str(i)
-        node.location = (-800, i * -300)
-
-        # TODO: Load global textures like color ramps.
-        image_name = f"{texture.hash:08X}"
-        image = bpy.data.images.get(image_name)
-        if image is None:
-            image = bpy.data.images.new(image_name, 4, 4, alpha=True)
-
-        node.image = image
-
-        # TODO: Error if U and V have the same wrap mode?
-        match texture.wrap_mode_s:
-            case sm4sh_model_py.WrapMode.Repeat:
-                node.extension = "REPEAT"
-            case sm4sh_model_py.WrapMode.MirroredRepeat:
-                node.extension = "MIRROR"
-            case sm4sh_model_py.WrapMode.ClampToEdge:
-                node.extension = "CLIP"
-
-        texture_nodes.append(node)
-
-    shader = database.get_shader(material.shader_id)
     if shader is not None:
+        # TODO: Does preserving the property order matter?
+        for i, name in enumerate(shader.parameters):
+            name = f"NU_{name}"
+            if name != "NU_materialHash":
+                node = create_node_group(nodes, "RgbaColor", rgba_color_node_group)
+                node.name = name
+                node.label = name
+
+        texture_nodes = []
+        for i, name in enumerate(shader.samplers):
+            node = nodes.new("ShaderNodeTexImage")
+            node.label = str(i)
+            node.name = name
+            node.location = (-800, i * -300)
+            texture_nodes.append(node)
+
         textures = {}
         for name, node in zip(shader.samplers, texture_nodes):
             textures[name] = node
@@ -122,7 +111,6 @@ def import_material(
         # TODO: Recreate the in game gamma correction and value range remapping from bloom.
         # TODO: handle alpha
         links.new(output_color.outputs["Color"], final_emission.inputs["Color"])
-
     else:
         # TODO: report error
         pass
@@ -130,6 +118,55 @@ def import_material(
     layout_nodes(output_node, links)
 
     return blender_material
+
+
+def update_material(
+    blender_material: bpy.types.Material,
+    material: sm4sh_model_py.NudMaterial,
+    shader: sm4sh_model_py.database.ShaderProgram,
+):
+    # Use custom properties to preserve values that are hard to represent in Blender.
+    blender_material["src_factor"] = str(material.src_factor).removeprefix("SrcFactor.")
+    blender_material["dst_factor"] = str(material.dst_factor).removeprefix("DstFactor.")
+    blender_material["alpha_func"] = str(material.alpha_func).removeprefix("AlphaFunc.")
+    blender_material["cull_mode"] = str(material.cull_mode).removeprefix("CullMode.")
+
+    for prop in material.properties:
+        if prop.name == "NU_materialHash":
+            material_hash = float32_bits(prop.values[0])
+            blender_material["NU_materialHash"] = f"{material_hash:08X}"
+
+    nodes = blender_material.node_tree.nodes
+
+    for prop in material.properties:
+        if prop.name != "NU_materialHash":
+            if node := nodes.get(prop.name):
+                node.inputs["Color"].default_value = [
+                    prop.values[0],
+                    prop.values[1],
+                    prop.values[2],
+                    1.0,
+                ]
+                node.inputs["Alpha"].default_value = prop.values[3]
+
+    for texture, name in zip(material.textures, shader.samplers):
+        if node := nodes.get(name):
+            # TODO: Load global textures like color ramps.
+            image_name = f"{texture.hash:08X}"
+            image = bpy.data.images.get(image_name)
+            if image is None:
+                image = bpy.data.images.new(image_name, 4, 4, alpha=True)
+
+            node.image = image
+
+            # TODO: Error if U and V have the same wrap mode?
+            match texture.wrap_mode_s:
+                case sm4sh_model_py.WrapMode.Repeat:
+                    node.extension = "REPEAT"
+                case sm4sh_model_py.WrapMode.MirroredRepeat:
+                    node.extension = "MIRROR"
+                case sm4sh_model_py.WrapMode.ClampToEdge:
+                    node.extension = "CLIP"
 
 
 def material_images_samplers(material, blender_images, samplers):
@@ -680,6 +717,9 @@ def import_attribute(name: str, nodes) -> bpy.types.Node:
                 node.attribute_name = "UV1"
             case "a_TexCoord2":
                 node.attribute_name = "UV2"
+            case "bitangent_sign":
+                # TODO: Is there a way to calculate this?
+                pass
 
     return node
 
