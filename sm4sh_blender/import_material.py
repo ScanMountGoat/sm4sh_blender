@@ -60,7 +60,6 @@ def create_material(
     output_node = nodes.new("ShaderNodeOutputMaterial")
 
     final_emission = nodes.new("ShaderNodeEmission")
-    links.new(final_emission.outputs["Emission"], output_node.inputs["Surface"])
 
     if shader is not None:
         # TODO: Does preserving the property order matter?
@@ -109,8 +108,26 @@ def create_material(
                 )
 
         # TODO: Recreate the in game gamma correction and value range remapping from bloom.
-        # TODO: handle alpha
         links.new(output_color.outputs["Color"], final_emission.inputs["Color"])
+
+        # Recreate alpha blending.
+        # TODO: Support additive and multiply blend modes.
+        mix_shaders = nodes.new("ShaderNodeMixShader")
+        if "out_attr0.w" in shader.output_dependencies:
+            assign_index(
+                shader.output_dependencies["out_attr0.w"],
+                expr_outputs,
+                links,
+                mix_shaders.inputs["Fac"],
+            )
+        else:
+            mix_shaders.inputs["Fac"].default_value = 1.0
+
+        transparent_shader = nodes.new("ShaderNodeBsdfTransparent")
+        links.new(transparent_shader.outputs["BSDF"], mix_shaders.inputs[1])
+        links.new(final_emission.outputs["Emission"], mix_shaders.inputs[2])
+
+        links.new(mix_shaders.outputs["Shader"], output_node.inputs["Surface"])
     else:
         # TODO: report error
         pass
