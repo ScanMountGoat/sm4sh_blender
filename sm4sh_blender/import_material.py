@@ -9,6 +9,7 @@ from sm4sh_blender.node_group import (
     normal_map_xyz_node_group,
     normalize_xyz_node_group,
     rgba_color_node_group,
+    sphere_map_coords_node_group,
 )
 from sm4sh_blender.node_layout import layout_nodes
 
@@ -473,6 +474,32 @@ def assign_output(
                 assign_arg(func.args[2], node.inputs["Z"])
 
                 return node, "Z"
+            case sm4sh_model_py.database.Operation.SphereMapCoordX:
+                # Reuse the node for other channels if possible.
+                name = func_name(func)
+                node = nodes.get(name)
+                if node is None:
+                    node = create_node_group(
+                        nodes, "SphereMapCoords", sphere_map_coords_node_group
+                    )
+                    node.name = func_name(func)
+
+                assign_arg(func.args[0], node.inputs["Param"])
+
+                return node, "X"
+            case sm4sh_model_py.database.Operation.SphereMapCoordY:
+                # Reuse the node for other channels if possible.
+                name = func_name(func)
+                node = nodes.get(name)
+                if node is None:
+                    node = create_node_group(
+                        nodes, "SphereMapCoords", sphere_map_coords_node_group
+                    )
+                    node.name = func_name(func)
+
+                assign_arg(func.args[0], node.inputs["Param"])
+
+                return node, "Y"
             case sm4sh_model_py.database.Operation.Unk:
                 return None
             case _:
@@ -698,6 +725,8 @@ def func_name_inner(op: sm4sh_model_py.database.Operation, args: list[int]):
         ("NormalMapX", "NormalMap"),
         ("NormalMapY", "NormalMap"),
         ("NormalMapZ", "NormalMap"),
+        ("SphereMapCoordX", "SphereMapCoord"),
+        ("SphereMapCoordY", "SphereMapCoord"),
     ]
     for old, new in replacements:
         if op_name.startswith(old):

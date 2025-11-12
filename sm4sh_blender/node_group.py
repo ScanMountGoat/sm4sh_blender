@@ -7,16 +7,16 @@ def create_node_group(nodes, name: str, create_node_tree):
     # Cache the node group creation.
     node_tree = bpy.data.node_groups.get(name)
     if node_tree is None:
-        node_tree = create_node_tree()
+        node_tree = create_node_tree(name)
 
     group = nodes.new("ShaderNodeGroup")
     group.node_tree = node_tree
     return group
 
 
-def rgba_color_node_group():
+def rgba_color_node_group(name: str):
     # TODO: Is it better to use XYZW naming?
-    node_tree = bpy.data.node_groups.new("RgbaColor", "ShaderNodeTree")
+    node_tree = bpy.data.node_groups.new(name, "ShaderNodeTree")
 
     node_tree.interface.new_socket(
         in_out="OUTPUT", socket_type="NodeSocketFloat", name="Red"
@@ -56,8 +56,8 @@ def rgba_color_node_group():
     return node_tree
 
 
-def dot4_node_group():
-    node_tree = bpy.data.node_groups.new("Dot4", "ShaderNodeTree")
+def dot4_node_group(name: str):
+    node_tree = bpy.data.node_groups.new(name, "ShaderNodeTree")
 
     node_tree.interface.new_socket(
         in_out="OUTPUT", socket_type="NodeSocketFloat", name="Value"
@@ -123,8 +123,8 @@ def dot4_node_group():
     return node_tree
 
 
-def normal_map_xyz_node_group():
-    node_tree = bpy.data.node_groups.new("NormalMapXYZ", "ShaderNodeTree")
+def normal_map_xyz_node_group(name: str):
+    node_tree = bpy.data.node_groups.new(name, "ShaderNodeTree")
 
     node_tree.interface.new_socket(
         in_out="OUTPUT", socket_type="NodeSocketFloat", name="X"
@@ -171,8 +171,8 @@ def normal_map_xyz_node_group():
     return node_tree
 
 
-def normalize_xyz_node_group():
-    node_tree = bpy.data.node_groups.new("NormalizeXYZ", "ShaderNodeTree")
+def normalize_xyz_node_group(name: str):
+    node_tree = bpy.data.node_groups.new(name, "ShaderNodeTree")
 
     node_tree.interface.new_socket(
         in_out="OUTPUT", socket_type="NodeSocketFloat", name="X"
@@ -214,6 +214,61 @@ def normalize_xyz_node_group():
     links.new(output_value.outputs["X"], output_node.inputs["X"])
     links.new(output_value.outputs["Y"], output_node.inputs["Y"])
     links.new(output_value.outputs["Z"], output_node.inputs["Z"])
+
+    layout_nodes(output_node, links)
+
+    return node_tree
+
+
+def sphere_map_coords_node_group(name: str):
+    node_tree = bpy.data.node_groups.new(name, "ShaderNodeTree")
+
+    node_tree.interface.new_socket(
+        in_out="OUTPUT", socket_type="NodeSocketFloat", name="X"
+    )
+    node_tree.interface.new_socket(
+        in_out="OUTPUT", socket_type="NodeSocketFloat", name="Y"
+    )
+
+    nodes = node_tree.nodes
+    links = node_tree.links
+
+    input_node = nodes.new("NodeGroupInput")
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="Param"
+    )
+
+    geometry = nodes.new("ShaderNodeNewGeometry")
+
+    adjusted_normal = nodes.new("ShaderNodeVectorMath")
+    adjusted_normal.operation = "MULTIPLY_ADD"
+    links.new(geometry.outputs["Position"], adjusted_normal.inputs[0])
+    links.new(input_node.outputs["Param"], adjusted_normal.inputs[1])
+    links.new(geometry.outputs["Normal"], adjusted_normal.inputs[2])
+
+    transform_normal = nodes.new("ShaderNodeVectorTransform")
+    transform_normal.convert_from = "OBJECT"
+    transform_normal.convert_to = "CAMERA"
+    links.new(adjusted_normal.outputs["Vector"], transform_normal.inputs["Vector"])
+
+    scale = nodes.new("ShaderNodeMath")
+    scale.operation = "MULTIPLY_ADD"
+    links.new(input_node.outputs["Param"], scale.inputs[0])
+    scale.inputs[1].default_value = -0.25
+    scale.inputs[2].default_value = 0.5
+
+    map_range = nodes.new("ShaderNodeVectorMath")
+    map_range.operation = "MULTIPLY_ADD"
+    links.new(transform_normal.outputs["Vector"], map_range.inputs[0])
+    links.new(scale.outputs["Value"], map_range.inputs[1])
+    map_range.inputs[2].default_value = (0.5, 0.5, 0.5)
+
+    xyz = nodes.new("ShaderNodeSeparateXYZ")
+    links.new(map_range.outputs["Vector"], xyz.inputs["Vector"])
+
+    output_node = nodes.new("NodeGroupOutput")
+    links.new(xyz.outputs["X"], output_node.inputs["X"])
+    links.new(xyz.outputs["Y"], output_node.inputs["Y"])
 
     layout_nodes(output_node, links)
 
