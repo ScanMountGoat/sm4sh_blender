@@ -575,15 +575,23 @@ def assign_parameter(
             return node, channel_name(parameter.channel)
 
     else:
+        node = nodes.new("ShaderNodeValue")
+        # TODO: add the Rust display impl to python?
+        label = parameter.name
+        if parameter.field:
+            label += f".{parameter.field}"
+        if parameter.index is not None:
+            label += f"[{parameter.index}]"
+        if parameter.channel:
+            label += f".{parameter.channel}"
+
+        node.label = label
+
         value = shader.parameter_value(parameter)
         if value is not None:
-            node = nodes.new("ShaderNodeValue")
-            # TODO: add the Rust display impl to python?
-            node.label = f"{parameter.name}.{parameter.field}.{parameter.channel}"
             node.outputs[0].default_value = value
-            return node, "Value"
 
-    return None
+        return node, "Value"
 
 
 def assign_attribute(
