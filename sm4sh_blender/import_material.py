@@ -281,6 +281,14 @@ def assign_output(
             ty,
         )
 
+        group_node = lambda func, name, create_node_tree: create_cached_func_group_node(
+            nodes, func, name, create_node_tree
+        )
+
+        assign_args = lambda func, node, params: assign_func_args(
+            func, params, expr_outputs, links, node
+        )
+
         assign_arg = lambda i, output: assign_index(i, expr_outputs, links, output)
 
         match func.op:
@@ -297,11 +305,7 @@ def assign_output(
             case sm4sh_model_py.database.Operation.Clamp:
                 node = nodes.new("ShaderNodeClamp")
                 node.name = func_name(func)
-
-                assign_arg(func.args[0], node.inputs["Value"])
-                assign_arg(func.args[1], node.inputs["Min"])
-                assign_arg(func.args[2], node.inputs["Max"])
-
+                assign_args(func, node, ["Value", "Min", "Max"])
                 return node, "Result"
             case sm4sh_model_py.database.Operation.Min:
                 return math_node("MINIMUM")
@@ -325,26 +329,16 @@ def assign_output(
 
                 if len(func.args) == 6:
                     # dot3
-                    assign_arg(func.args[0], node.inputs["A.x"])
-                    assign_arg(func.args[1], node.inputs["A.y"])
-                    assign_arg(func.args[2], node.inputs["A.z"])
+                    assign_args(func, node, ["A.x", "A.y", "A.z", "B.x", "B.y", "B.z"])
                     node.inputs["A.w"].default_value = 0.0
-
-                    assign_arg(func.args[3], node.inputs["B.x"])
-                    assign_arg(func.args[4], node.inputs["B.y"])
-                    assign_arg(func.args[5], node.inputs["B.z"])
                     node.inputs["B.w"].default_value = 0.0
                 else:
                     # dot4
-                    assign_arg(func.args[0], node.inputs["A.x"])
-                    assign_arg(func.args[1], node.inputs["A.y"])
-                    assign_arg(func.args[2], node.inputs["A.z"])
-                    assign_arg(func.args[3], node.inputs["A.w"])
-
-                    assign_arg(func.args[4], node.inputs["B.x"])
-                    assign_arg(func.args[5], node.inputs["B.y"])
-                    assign_arg(func.args[6], node.inputs["B.z"])
-                    assign_arg(func.args[7], node.inputs["B.w"])
+                    assign_args(
+                        func,
+                        node,
+                        ["A.x", "A.y", "A.z", "A.w", "B.x", "B.y", "B.z", "B.w"],
+                    )
 
                 return node, "Value"
             case sm4sh_model_py.database.Operation.Sin:
@@ -400,210 +394,66 @@ def assign_output(
                 # TODO: node group for geq?
                 return math_node("GREATER_THAN")
             case sm4sh_model_py.database.Operation.NormalMapX:
-                # Reuse the node for other channels if possible.
-                name = func_name(func)
-                node = nodes.get(name)
-                if node is None:
-                    node = create_node_group(
-                        nodes, "NormalMapXYZ", normal_map_xyz_node_group
-                    )
-                    node.name = func_name(func)
-
-                assign_arg(func.args[0], node.inputs["X"])
-                assign_arg(func.args[1], node.inputs["Y"])
-                assign_arg(func.args[2], node.inputs["Z"])
-
+                node = group_node(func, "NormalMapXYZ", normal_map_xyz_node_group)
+                assign_args(func, node, ["X", "Y", "Z"])
                 return node, "X"
             case sm4sh_model_py.database.Operation.NormalMapY:
-                # Reuse the node for other channels if possible.
-                name = func_name(func)
-                node = nodes.get(name)
-                if node is None:
-                    node = create_node_group(
-                        nodes, "NormalMapXYZ", normal_map_xyz_node_group
-                    )
-                    node.name = func_name(func)
-
-                assign_arg(func.args[0], node.inputs["X"])
-                assign_arg(func.args[1], node.inputs["Y"])
-                assign_arg(func.args[2], node.inputs["Z"])
-
+                node = group_node(func, "NormalMapXYZ", normal_map_xyz_node_group)
+                assign_args(func, node, ["X", "Y", "Z"])
                 return node, "Y"
             case sm4sh_model_py.database.Operation.NormalMapZ:
-                # Reuse the node for other channels if possible.
-                name = func_name(func)
-                node = nodes.get(name)
-                if node is None:
-                    node = create_node_group(
-                        nodes, "NormalMapXYZ", normal_map_xyz_node_group
-                    )
-                    node.name = func_name(func)
-
-                assign_arg(func.args[0], node.inputs["X"])
-                assign_arg(func.args[1], node.inputs["Y"])
-                assign_arg(func.args[2], node.inputs["Z"])
-
+                node = group_node(func, "NormalMapXYZ", normal_map_xyz_node_group)
+                assign_args(func, node, ["X", "Y", "Z"])
                 return node, "Z"
             case sm4sh_model_py.database.Operation.NormalizeX:
-                # Reuse the node for other channels if possible.
-                name = func_name(func)
-                node = nodes.get(name)
-                if node is None:
-                    node = create_node_group(
-                        nodes, "NormalizeXYZ", normalize_xyz_node_group
-                    )
-                    node.name = func_name(func)
-
-                assign_arg(func.args[0], node.inputs["X"])
-                assign_arg(func.args[1], node.inputs["Y"])
-                assign_arg(func.args[2], node.inputs["Z"])
-
+                node = group_node(func, "NormalizeXYZ", normalize_xyz_node_group)
+                assign_args(func, node, ["X", "Y", "Z"])
                 return node, "X"
             case sm4sh_model_py.database.Operation.NormalizeY:
-                # Reuse the node for other channels if possible.
-                name = func_name(func)
-                node = nodes.get(name)
-                if node is None:
-                    node = create_node_group(
-                        nodes, "NormalizeXYZ", normalize_xyz_node_group
-                    )
-                    node.name = func_name(func)
-
-                assign_arg(func.args[0], node.inputs["X"])
-                assign_arg(func.args[1], node.inputs["Y"])
-                assign_arg(func.args[2], node.inputs["Z"])
-
+                node = group_node(func, "NormalizeXYZ", normalize_xyz_node_group)
+                assign_args(func, node, ["X", "Y", "Z"])
                 return node, "Y"
             case sm4sh_model_py.database.Operation.NormalizeZ:
-                # Reuse the node for other channels if possible.
-                name = func_name(func)
-                node = nodes.get(name)
-                if node is None:
-                    node = create_node_group(
-                        nodes, "NormalizeXYZ", normalize_xyz_node_group
-                    )
-                    node.name = func_name(func)
-
-                assign_arg(func.args[0], node.inputs["X"])
-                assign_arg(func.args[1], node.inputs["Y"])
-                assign_arg(func.args[2], node.inputs["Z"])
-
+                node = group_node(func, "NormalizeXYZ", normalize_xyz_node_group)
+                assign_args(func, node, ["X", "Y", "Z"])
                 return node, "Z"
             case sm4sh_model_py.database.Operation.SphereMapCoordX:
-                # Reuse the node for other channels if possible.
-                name = func_name(func)
-                node = nodes.get(name)
-                if node is None:
-                    node = create_node_group(
-                        nodes, "SphereMapCoords", sphere_map_coords_node_group
-                    )
-                    node.name = func_name(func)
-
-                assign_arg(func.args[0], node.inputs["Param"])
-
+                node = group_node(func, "SphereMapCoords", sphere_map_coords_node_group)
+                assign_args(func, node, ["Param"])
                 return node, "X"
             case sm4sh_model_py.database.Operation.SphereMapCoordY:
-                # Reuse the node for other channels if possible.
-                name = func_name(func)
-                node = nodes.get(name)
-                if node is None:
-                    node = create_node_group(
-                        nodes, "SphereMapCoords", sphere_map_coords_node_group
-                    )
-                    node.name = func_name(func)
-
-                assign_arg(func.args[0], node.inputs["Param"])
-
+                node = group_node(func, "SphereMapCoords", sphere_map_coords_node_group)
+                assign_args(func, node, ["Param"])
                 return node, "Y"
             case sm4sh_model_py.database.Operation.LocalToWorldPointX:
-                # Reuse the node for other channels if possible.
-                name = func_name(func)
-                node = nodes.get(name)
-                if node is None:
-                    node = create_node_group(
-                        nodes, "LocalToWorldPoint", transform_point_node_group
-                    )
-                    node.name = func_name(func)
-
-                assign_arg(func.args[0], node.inputs["X"])
-                assign_arg(func.args[1], node.inputs["Y"])
-                assign_arg(func.args[2], node.inputs["Z"])
-
+                node = group_node(func, "LocalToWorldPoint", transform_point_node_group)
+                assign_args(func, node, ["X", "Y", "Z"])
                 return node, "X"
             case sm4sh_model_py.database.Operation.LocalToWorldPointY:
-                # Reuse the node for other channels if possible.
-                name = func_name(func)
-                node = nodes.get(name)
-                if node is None:
-                    node = create_node_group(
-                        nodes, "LocalToWorldPoint", transform_point_node_group
-                    )
-                    node.name = func_name(func)
-
-                assign_arg(func.args[0], node.inputs["X"])
-                assign_arg(func.args[1], node.inputs["Y"])
-                assign_arg(func.args[2], node.inputs["Z"])
-
+                node = group_node(func, "LocalToWorldPoint", transform_point_node_group)
+                assign_args(func, node, ["X", "Y", "Z"])
                 return node, "Y"
             case sm4sh_model_py.database.Operation.LocalToWorldPointZ:
-                # Reuse the node for other channels if possible.
-                name = func_name(func)
-                node = nodes.get(name)
-                if node is None:
-                    node = create_node_group(
-                        nodes, "LocalToWorldPoint", transform_point_node_group
-                    )
-                    node.name = func_name(func)
-
-                assign_arg(func.args[0], node.inputs["X"])
-                assign_arg(func.args[1], node.inputs["Y"])
-                assign_arg(func.args[2], node.inputs["Z"])
-
+                node = group_node(func, "LocalToWorldPoint", transform_point_node_group)
+                assign_args(func, node, ["X", "Y", "Z"])
                 return node, "Z"
             case sm4sh_model_py.database.Operation.LocalToWorldVectorX:
-                # Reuse the node for other channels if possible.
-                name = func_name(func)
-                node = nodes.get(name)
-                if node is None:
-                    node = create_node_group(
-                        nodes, "LocalToWorldVector", transform_vector_node_group
-                    )
-                    node.name = func_name(func)
-
-                assign_arg(func.args[0], node.inputs["X"])
-                assign_arg(func.args[1], node.inputs["Y"])
-                assign_arg(func.args[2], node.inputs["Z"])
-
+                node = group_node(
+                    func, "LocalToWorldVector", transform_vector_node_group
+                )
+                assign_args(func, node, ["X", "Y", "Z"])
                 return node, "X"
             case sm4sh_model_py.database.Operation.LocalToWorldVectorY:
-                # Reuse the node for other channels if possible.
-                name = func_name(func)
-                node = nodes.get(name)
-                if node is None:
-                    node = create_node_group(
-                        nodes, "LocalToWorldVector", transform_vector_node_group
-                    )
-                    node.name = func_name(func)
-
-                assign_arg(func.args[0], node.inputs["X"])
-                assign_arg(func.args[1], node.inputs["Y"])
-                assign_arg(func.args[2], node.inputs["Z"])
-
+                node = group_node(
+                    func, "LocalToWorldVector", transform_vector_node_group
+                )
+                assign_args(func, node, ["X", "Y", "Z"])
                 return node, "Y"
             case sm4sh_model_py.database.Operation.LocalToWorldVectorZ:
-                # Reuse the node for other channels if possible.
-                name = func_name(func)
-                node = nodes.get(name)
-                if node is None:
-                    node = create_node_group(
-                        nodes, "LocalToWorldVector", transform_vector_node_group
-                    )
-                    node.name = func_name(func)
-
-                assign_arg(func.args[0], node.inputs["X"])
-                assign_arg(func.args[1], node.inputs["Y"])
-                assign_arg(func.args[2], node.inputs["Z"])
-
+                node = group_node(
+                    func, "LocalToWorldVector", transform_vector_node_group
+                )
+                assign_args(func, node, ["X", "Y", "Z"])
                 return node, "Z"
             case sm4sh_model_py.database.Operation.Unk:
                 return None
@@ -891,3 +741,29 @@ def import_attribute(name: str, nodes) -> bpy.types.Node:
 
 def float32_bits(f: float) -> int:
     return struct.unpack("@I", struct.pack("@f", f))[0]
+
+
+def create_cached_func_group_node(
+    nodes,
+    func: sm4sh_model_py.database.OutputExprFunc,
+    node_group_name: str,
+    create_node_tree,
+) -> bpy.types.Node:
+    name = func_name(func)
+    node = nodes.get(name)
+    if node is None:
+        node = create_node_group(nodes, node_group_name, create_node_tree)
+        node.name = name
+
+    return node
+
+
+def assign_func_args(
+    func: sm4sh_model_py.database.OutputExprFunc,
+    params: list[int | str],
+    assignment_outputs: list[Optional[Tuple[bpy.types.Node, str]]],
+    links,
+    node: bpy.types.Node,
+):
+    for i, param in zip(func.args, params):
+        assign_index(i, assignment_outputs, links, node.inputs[param])
