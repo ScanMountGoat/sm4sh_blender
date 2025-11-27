@@ -10,6 +10,8 @@ from sm4sh_blender.node_group import (
     normalize_xyz_node_group,
     rgba_color_node_group,
     sphere_map_coords_node_group,
+    transform_point_node_group,
+    transform_vector_node_group,
 )
 from sm4sh_blender.node_layout import layout_nodes
 
@@ -317,19 +319,32 @@ def assign_output(
                 return math_node("INVERSE_SQRT")
             case sm4sh_model_py.database.Operation.Fma:
                 return math_node("MULTIPLY_ADD")
-            case sm4sh_model_py.database.Operation.Dot4:
+            case sm4sh_model_py.database.Operation.Dot:
                 node = create_node_group(nodes, "Dot4", dot4_node_group)
                 node.name = func_name(func)
 
-                assign_arg(func.args[0], node.inputs["A.x"])
-                assign_arg(func.args[1], node.inputs["A.y"])
-                assign_arg(func.args[2], node.inputs["A.z"])
-                assign_arg(func.args[3], node.inputs["A.w"])
+                if len(func.args) == 6:
+                    # dot3
+                    assign_arg(func.args[0], node.inputs["A.x"])
+                    assign_arg(func.args[1], node.inputs["A.y"])
+                    assign_arg(func.args[2], node.inputs["A.z"])
+                    node.inputs["A.w"].default_value = 0.0
 
-                assign_arg(func.args[4], node.inputs["B.x"])
-                assign_arg(func.args[5], node.inputs["B.y"])
-                assign_arg(func.args[6], node.inputs["B.z"])
-                assign_arg(func.args[7], node.inputs["B.w"])
+                    assign_arg(func.args[3], node.inputs["B.x"])
+                    assign_arg(func.args[4], node.inputs["B.y"])
+                    assign_arg(func.args[5], node.inputs["B.z"])
+                    node.inputs["B.w"].default_value = 0.0
+                else:
+                    # dot4
+                    assign_arg(func.args[0], node.inputs["A.x"])
+                    assign_arg(func.args[1], node.inputs["A.y"])
+                    assign_arg(func.args[2], node.inputs["A.z"])
+                    assign_arg(func.args[3], node.inputs["A.w"])
+
+                    assign_arg(func.args[4], node.inputs["B.x"])
+                    assign_arg(func.args[5], node.inputs["B.y"])
+                    assign_arg(func.args[6], node.inputs["B.z"])
+                    assign_arg(func.args[7], node.inputs["B.w"])
 
                 return node, "Value"
             case sm4sh_model_py.database.Operation.Sin:
@@ -500,6 +515,96 @@ def assign_output(
                 assign_arg(func.args[0], node.inputs["Param"])
 
                 return node, "Y"
+            case sm4sh_model_py.database.Operation.LocalToWorldPointX:
+                # Reuse the node for other channels if possible.
+                name = func_name(func)
+                node = nodes.get(name)
+                if node is None:
+                    node = create_node_group(
+                        nodes, "LocalToWorldPoint", transform_point_node_group
+                    )
+                    node.name = func_name(func)
+
+                assign_arg(func.args[0], node.inputs["X"])
+                assign_arg(func.args[1], node.inputs["Y"])
+                assign_arg(func.args[2], node.inputs["Z"])
+
+                return node, "X"
+            case sm4sh_model_py.database.Operation.LocalToWorldPointY:
+                # Reuse the node for other channels if possible.
+                name = func_name(func)
+                node = nodes.get(name)
+                if node is None:
+                    node = create_node_group(
+                        nodes, "LocalToWorldPoint", transform_point_node_group
+                    )
+                    node.name = func_name(func)
+
+                assign_arg(func.args[0], node.inputs["X"])
+                assign_arg(func.args[1], node.inputs["Y"])
+                assign_arg(func.args[2], node.inputs["Z"])
+
+                return node, "Y"
+            case sm4sh_model_py.database.Operation.LocalToWorldPointZ:
+                # Reuse the node for other channels if possible.
+                name = func_name(func)
+                node = nodes.get(name)
+                if node is None:
+                    node = create_node_group(
+                        nodes, "LocalToWorldPoint", transform_point_node_group
+                    )
+                    node.name = func_name(func)
+
+                assign_arg(func.args[0], node.inputs["X"])
+                assign_arg(func.args[1], node.inputs["Y"])
+                assign_arg(func.args[2], node.inputs["Z"])
+
+                return node, "Z"
+            case sm4sh_model_py.database.Operation.LocalToWorldVectorX:
+                # Reuse the node for other channels if possible.
+                name = func_name(func)
+                node = nodes.get(name)
+                if node is None:
+                    node = create_node_group(
+                        nodes, "LocalToWorldVector", transform_vector_node_group
+                    )
+                    node.name = func_name(func)
+
+                assign_arg(func.args[0], node.inputs["X"])
+                assign_arg(func.args[1], node.inputs["Y"])
+                assign_arg(func.args[2], node.inputs["Z"])
+
+                return node, "X"
+            case sm4sh_model_py.database.Operation.LocalToWorldVectorY:
+                # Reuse the node for other channels if possible.
+                name = func_name(func)
+                node = nodes.get(name)
+                if node is None:
+                    node = create_node_group(
+                        nodes, "LocalToWorldVector", transform_vector_node_group
+                    )
+                    node.name = func_name(func)
+
+                assign_arg(func.args[0], node.inputs["X"])
+                assign_arg(func.args[1], node.inputs["Y"])
+                assign_arg(func.args[2], node.inputs["Z"])
+
+                return node, "Y"
+            case sm4sh_model_py.database.Operation.LocalToWorldVectorZ:
+                # Reuse the node for other channels if possible.
+                name = func_name(func)
+                node = nodes.get(name)
+                if node is None:
+                    node = create_node_group(
+                        nodes, "LocalToWorldVector", transform_vector_node_group
+                    )
+                    node.name = func_name(func)
+
+                assign_arg(func.args[0], node.inputs["X"])
+                assign_arg(func.args[1], node.inputs["Y"])
+                assign_arg(func.args[2], node.inputs["Z"])
+
+                return node, "Z"
             case sm4sh_model_py.database.Operation.Unk:
                 return None
             case _:
@@ -735,6 +840,12 @@ def func_name_inner(op: sm4sh_model_py.database.Operation, args: list[int]):
         ("NormalMapZ", "NormalMap"),
         ("SphereMapCoordX", "SphereMapCoord"),
         ("SphereMapCoordY", "SphereMapCoord"),
+        ("LocalToWorldPointX", "LocalToWorldPoint"),
+        ("LocalToWorldPointY", "LocalToWorldPoint"),
+        ("LocalToWorldPointZ", "LocalToWorldPoint"),
+        ("LocalToWorldVectorX", "LocalToWorldVector"),
+        ("LocalToWorldVectorY", "LocalToWorldVector"),
+        ("LocalToWorldVectorZ", "LocalToWorldVector"),
     ]
     for old, new in replacements:
         if op_name.startswith(old):

@@ -273,3 +273,105 @@ def sphere_map_coords_node_group(name: str):
     layout_nodes(output_node, links)
 
     return node_tree
+
+
+def transform_point_node_group(name: str):
+    node_tree = bpy.data.node_groups.new(name, "ShaderNodeTree")
+
+    node_tree.interface.new_socket(
+        in_out="OUTPUT", socket_type="NodeSocketFloat", name="X"
+    )
+    node_tree.interface.new_socket(
+        in_out="OUTPUT", socket_type="NodeSocketFloat", name="Y"
+    )
+    node_tree.interface.new_socket(
+        in_out="OUTPUT", socket_type="NodeSocketFloat", name="Z"
+    )
+
+    nodes = node_tree.nodes
+    links = node_tree.links
+
+    input_node = nodes.new("NodeGroupInput")
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="X"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="Y"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="Z"
+    )
+
+    input_vector = nodes.new("ShaderNodeCombineXYZ")
+    links.new(input_node.outputs["X"], input_vector.inputs["X"])
+    links.new(input_node.outputs["Y"], input_vector.inputs["Y"])
+    links.new(input_node.outputs["Z"], input_vector.inputs["Z"])
+
+    transform = nodes.new("ShaderNodeVectorTransform")
+    transform.vector_type = "POINT"
+    transform.convert_from = "OBJECT"
+    transform.convert_to = "WORLD"
+    links.new(input_vector.outputs["Vector"], transform.inputs["Vector"])
+
+    output_vector = nodes.new("ShaderNodeSeparateXYZ")
+    links.new(transform.outputs["Vector"], output_vector.inputs["Vector"])
+
+    output_node = nodes.new("NodeGroupOutput")
+    links.new(output_vector.outputs["X"], output_node.inputs["X"])
+    links.new(output_vector.outputs["Y"], output_node.inputs["Y"])
+    links.new(output_vector.outputs["Z"], output_node.inputs["Z"])
+
+    layout_nodes(output_node, links)
+
+    return node_tree
+
+
+def transform_vector_node_group(name: str):
+    node_tree = bpy.data.node_groups.new(name, "ShaderNodeTree")
+
+    node_tree.interface.new_socket(
+        in_out="OUTPUT", socket_type="NodeSocketFloat", name="X"
+    )
+    node_tree.interface.new_socket(
+        in_out="OUTPUT", socket_type="NodeSocketFloat", name="Y"
+    )
+    node_tree.interface.new_socket(
+        in_out="OUTPUT", socket_type="NodeSocketFloat", name="Z"
+    )
+
+    nodes = node_tree.nodes
+    links = node_tree.links
+
+    input_node = nodes.new("NodeGroupInput")
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="X"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="Y"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="Z"
+    )
+
+    input_vector = nodes.new("ShaderNodeCombineXYZ")
+    links.new(input_node.outputs["X"], input_vector.inputs["X"])
+    links.new(input_node.outputs["Y"], input_vector.inputs["Y"])
+    links.new(input_node.outputs["Z"], input_vector.inputs["Z"])
+
+    transform = nodes.new("ShaderNodeVectorTransform")
+    transform.vector_type = "VECTOR"
+    transform.convert_from = "OBJECT"
+    transform.convert_to = "WORLD"
+    links.new(input_vector.outputs["Vector"], transform.inputs["Vector"])
+
+    output_vector = nodes.new("ShaderNodeSeparateXYZ")
+    links.new(transform.outputs["Vector"], output_vector.inputs["Vector"])
+
+    output_node = nodes.new("NodeGroupOutput")
+    links.new(output_vector.outputs["X"], output_node.inputs["X"])
+    links.new(output_vector.outputs["Y"], output_node.inputs["Y"])
+    links.new(output_vector.outputs["Z"], output_node.inputs["Z"])
+
+    layout_nodes(output_node, links)
+
+    return node_tree
