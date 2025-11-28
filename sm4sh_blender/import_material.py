@@ -6,6 +6,9 @@ import struct
 from sm4sh_blender.node_group import (
     create_node_group,
     dot4_node_group,
+    geometry_bitangent_node_group,
+    geometry_normal_node_group,
+    geometry_tangent_node_group,
     normal_map_xyz_node_group,
     normalize_xyz_node_group,
     rgba_color_node_group,
@@ -527,7 +530,7 @@ def assign_parameter(
         name = f"NU_{parameter.field}"
         if node := nodes.get(name):
             # NU_ nodes use a custom node group for RGBA channel support.
-            return node, channel_name(parameter.channel)
+            return node, channel_rgba_name(parameter.channel)
 
     else:
         node = nodes.new("ShaderNodeValue")
@@ -551,15 +554,70 @@ def assign_parameter(
 
 def assign_attribute(
     attribute: sm4sh_model_py.database.Attribute, nodes, links
+) -> Optional[Tuple[bpy.types.Node, str]]:
+    name = attribute.name
+    channel = attribute.channel
+
+    # Some attributes aren't exposed directly and require custom node groups.
+    match name:
+        case "a_Position":
+            return assign_attribute_node(nodes, links, name, channel, "position")
+        case "a_Normal":
+            node = nodes.get(name)
+            if node is None:
+                node = create_node_group(
+                    nodes, "GeometryNormal", geometry_normal_node_group
+                )
+                node.name = name
+
+            return node, channel_name(channel)
+        case "a_Tangent":
+            node = nodes.get(name)
+            if node is None:
+                node = create_node_group(
+                    nodes, "GeometryTangent", geometry_tangent_node_group
+                )
+                node.name = name
+
+            return node, channel_name(channel)
+        case "a_Binormal":
+            node = nodes.get(name)
+            if node is None:
+                node = create_node_group(
+                    nodes, "GeometryBitangent", geometry_bitangent_node_group
+                )
+                node.name = name
+
+            return node, channel_name(channel)
+        case "a_Color":
+            return assign_attribute_node(nodes, links, name, channel, "Color")
+        case "a_TexCoord0":
+            return assign_attribute_node(nodes, links, name, channel, "UV0")
+        case "a_TexCoord1":
+            return assign_attribute_node(nodes, links, name, channel, "UV1")
+        case "a_TexCoord2":
+            return assign_attribute_node(nodes, links, name, channel, "UV2")
+        case "bitangent_sign":
+            # TODO: Is there a way to calculate this?
+            return None
+
+
+def assign_attribute_node(
+    nodes, links, name: str, channel: Optional[str], attribute_name: str
 ) -> Tuple[bpy.types.Node, str]:
-    node = import_attribute(attribute.name, nodes)
-    return assign_channel(attribute.name, attribute.channel, node, nodes, links)
+    node = nodes.get(name)
+    if node is None:
+        node = nodes.new("ShaderNodeAttribute")
+        node.name = name
+        node.attribute_name = attribute_name
+
+    return assign_channel(name, channel, node, nodes, links)
 
 
 def assign_channel(
     name: str, channel: Optional[str], node, nodes, links
 ) -> Tuple[bpy.types.Node, str]:
-    output = channel_name(channel)
+    output = channel_rgba_name(channel)
     if output == "Alpha":
         # Alpha isn't part of the RGB node.
         return node, "Alpha"
@@ -575,7 +633,7 @@ def assign_channel(
         return rgb_node, output
 
 
-def channel_name(channel: Optional[str]) -> str:
+def channel_rgba_name(channel: Optional[str]) -> str:
     match channel:
         case "x":
             return "Red"
@@ -588,6 +646,21 @@ def channel_name(channel: Optional[str]) -> str:
 
     # TODO: How to handle the None case?
     return "Red"
+
+
+def channel_name(channel: Optional[str]) -> str:
+    match channel:
+        case "x":
+            return "X"
+        case "y":
+            return "Y"
+        case "z":
+            return "Z"
+        case "w":
+            return "W"
+
+    # TODO: How to handle the None case?
+    return "X"
 
 
 def assign_mix_rgba(
@@ -710,33 +783,6 @@ def func_name_inner(op: sm4sh_model_py.database.Operation, args: list[int]):
 def texture_assignment_name(texture):
     coords = ", ".join(str(c) for c in texture.texcoords)
     return f"{texture.name}({coords})"
-
-
-def import_attribute(name: str, nodes) -> bpy.types.Node:
-    node = nodes.get(name)
-    if node is None:
-        node = nodes.new("ShaderNodeAttribute")
-        node.name = name
-
-        # TODO: Use normal map node red, green, blue to get TBN vectors
-        match name:
-            case "a_Position":
-                node.attribute_name = "position"
-            case "a_Normal":
-                node.attribute_name = "VertexNormal"
-            case "a_Color":
-                node.attribute_name = "Color"
-            case "a_TexCoord0":
-                node.attribute_name = "UV0"
-            case "a_TexCoord1":
-                node.attribute_name = "UV1"
-            case "a_TexCoord2":
-                node.attribute_name = "UV2"
-            case "bitangent_sign":
-                # TODO: Is there a way to calculate this?
-                pass
-
-    return node
 
 
 def float32_bits(f: float) -> int:

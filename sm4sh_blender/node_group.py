@@ -1,3 +1,4 @@
+from typing import Tuple
 import bpy
 
 from sm4sh_blender.node_layout import layout_nodes
@@ -366,6 +367,84 @@ def transform_vector_node_group(name: str):
 
     output_vector = nodes.new("ShaderNodeSeparateXYZ")
     links.new(transform.outputs["Vector"], output_vector.inputs["Vector"])
+
+    output_node = nodes.new("NodeGroupOutput")
+    links.new(output_vector.outputs["X"], output_node.inputs["X"])
+    links.new(output_vector.outputs["Y"], output_node.inputs["Y"])
+    links.new(output_vector.outputs["Z"], output_node.inputs["Z"])
+
+    layout_nodes(output_node, links)
+
+    return node_tree
+
+
+def geometry_bitangent_node_group(name: str):
+    node_tree = bpy.data.node_groups.new(name, "ShaderNodeTree")
+
+    node_tree.interface.new_socket(
+        in_out="OUTPUT", socket_type="NodeSocketFloat", name="X"
+    )
+    node_tree.interface.new_socket(
+        in_out="OUTPUT", socket_type="NodeSocketFloat", name="Y"
+    )
+    node_tree.interface.new_socket(
+        in_out="OUTPUT", socket_type="NodeSocketFloat", name="Z"
+    )
+
+    nodes = node_tree.nodes
+    links = node_tree.links
+
+    # Blender doesn't expose this directly, but we can use a vector to select the bitangent.
+    tbn = nodes.new("ShaderNodeNormalMap")
+    tbn.inputs["Color"].default_value = (0.0, 1.0, 0.0, 1.0)
+
+    output_vector = nodes.new("ShaderNodeSeparateXYZ")
+    links.new(tbn.outputs["Vector"], output_vector.inputs["Vector"])
+
+    output_node = nodes.new("NodeGroupOutput")
+    links.new(output_vector.outputs["X"], output_node.inputs["X"])
+    links.new(output_vector.outputs["Y"], output_node.inputs["Y"])
+    links.new(output_vector.outputs["Z"], output_node.inputs["Z"])
+
+    layout_nodes(output_node, links)
+
+    return node_tree
+
+
+def geometry_tangent_node_group(name: str):
+    return geometry_tbn_node_group_inner(name, (1.0, 0.0, 0.0, 1.0))
+
+
+def geometry_bitangent_node_group(name: str):
+    return geometry_tbn_node_group_inner(name, (0.0, 1.0, 0.0, 1.0))
+
+
+def geometry_normal_node_group(name: str):
+    return geometry_tbn_node_group_inner(name, (0.0, 0.0, 1.0, 1.0))
+
+
+def geometry_tbn_node_group_inner(name: str, rgba: Tuple[float, float, float, float]):
+    node_tree = bpy.data.node_groups.new(name, "ShaderNodeTree")
+
+    node_tree.interface.new_socket(
+        in_out="OUTPUT", socket_type="NodeSocketFloat", name="X"
+    )
+    node_tree.interface.new_socket(
+        in_out="OUTPUT", socket_type="NodeSocketFloat", name="Y"
+    )
+    node_tree.interface.new_socket(
+        in_out="OUTPUT", socket_type="NodeSocketFloat", name="Z"
+    )
+
+    nodes = node_tree.nodes
+    links = node_tree.links
+
+    # The TBN basis vectors can be exposed by using values like (1,0,0), (0,1,0), or (0,0,1)
+    tbn = nodes.new("ShaderNodeNormalMap")
+    tbn.inputs["Color"].default_value = rgba
+
+    output_vector = nodes.new("ShaderNodeSeparateXYZ")
+    links.new(tbn.outputs["Normal"], output_vector.inputs["Vector"])
 
     output_node = nodes.new("NodeGroupOutput")
     links.new(output_vector.outputs["X"], output_node.inputs["X"])
