@@ -25,6 +25,7 @@ def import_nud_model(
     context,
     model: sm4sh_model_py.NudModel,
     database: sm4sh_model_py.database.ShaderDatabase,
+    use_advanced_nodes: bool,
 ) -> Optional[bpy.types.Object]:
     # These images will be referenced later by name.
     # TODO: Check for duplicates?
@@ -49,6 +50,7 @@ def import_nud_model(
                 armature,
                 bone_names,
                 database,
+                use_advanced_nodes,
             )
 
     return armature
@@ -63,6 +65,7 @@ def import_mesh(
     armature: Optional[bpy.types.Object],
     bone_names: list[str],
     database: sm4sh_model_py.database.ShaderDatabase,
+    use_advanced_nodes: bool,
 ):
     # Match Blender's naming conventions to preserve order for export.
     name = f"{group.name}.{i:03}" if i > 0 else group.name
@@ -109,13 +112,21 @@ def import_mesh(
     blender_mesh.transform(y_up_to_z_up)
 
     if material := mesh.material1:
-        blender_mesh.materials.append(import_material(material, database))
+        blender_mesh.materials.append(
+            import_material(material, database, use_advanced_nodes)
+        )
     if material := mesh.material2:
-        blender_mesh.materials.append(import_material(material, database))
+        blender_mesh.materials.append(
+            import_material(material, database, use_advanced_nodes)
+        )
     if material := mesh.material3:
-        blender_mesh.materials.append(import_material(material, database))
+        blender_mesh.materials.append(
+            import_material(material, database, use_advanced_nodes)
+        )
     if material := mesh.material4:
-        blender_mesh.materials.append(import_material(material, database))
+        blender_mesh.materials.append(
+            import_material(material, database, use_advanced_nodes)
+        )
 
     obj = bpy.data.objects.new(blender_mesh.name, blender_mesh)
 
