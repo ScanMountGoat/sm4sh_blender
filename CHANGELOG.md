@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 * Added an import option for recreating in game shaders with Blender's material nodes. This option is still experimental and disabled by default.
 
+### Fixed
+* Fixed an issue where importing would fail for compressed model.nut files. 
+
 ## 0.2.1 - 2025-11-12
 ### Fixed
 * Fixed a compatibility issue preventing animation import in Blender 5.0.
