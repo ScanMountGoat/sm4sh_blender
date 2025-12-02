@@ -472,15 +472,22 @@ def export_material(material: bpy.types.Material) -> sm4sh_model_py.NudMaterial:
     # TODO: Does property order matter?
     for node in material.node_tree.nodes:
         if node.label.startswith("NU_"):
-            try:
-                values = node.outputs[0].default_value
-            except:
-                values = [0, 0, 0, 0]
+            # TODO: Find a more reliably way to support ShaderNodeRGB and RGBA node group.
+            if "Color" in node.inputs:
+                rgb = node.inputs["Color"].default_value
+                alpha = node.inputs["Alpha"].default_value
+                values = [rgb[0], rgb[1], rgb[2], alpha]
+            else:
+                try:
+                    rgba = node.outputs[0].default_value
+                    values = [rgba[0], rgba[1], rgba[2], rgba[3]]
+                except:
+                    values = [0, 0, 0, 0]
 
             properties.append(sm4sh_model_py.NudProperty(node.label, values))
         elif node.bl_idname == "ShaderNodeTexImage":
             texture_index = parse_int(node.label)
-            if texture_index is not None:
+            if texture_index is not None and node.image is not None:
                 if hash := parse_int(node.image.name, 16):
                     # TODO: Preserve wrap mode for both U and V?
                     wrap_s = sm4sh_model_py.WrapMode.ClampToEdge
@@ -521,11 +528,13 @@ def export_material(material: bpy.types.Material) -> sm4sh_model_py.NudMaterial:
         sm4sh_model_py.NudProperty("NU_materialHash", [material_hash, 0, 0, 0])
     )
 
+    alpha_ref = 0
     return sm4sh_model_py.NudMaterial(
         flags,
         src_factor,
         dst_factor,
         alpha_func,
+        alpha_ref,
         cull_mode,
         textures,
         properties,

@@ -4,6 +4,8 @@ import bpy
 import numpy as np
 import math
 import struct
+
+from sm4sh_blender.import_material import import_material
 from . import sm4sh_model_py
 from mathutils import Matrix
 
@@ -23,6 +25,7 @@ def import_nud_model(
     context,
     model: sm4sh_model_py.NudModel,
     database: sm4sh_model_py.database.ShaderDatabase,
+    use_advanced_nodes: bool,
 ) -> Optional[bpy.types.Object]:
     # These images will be referenced later by name.
     # TODO: Check for duplicates?
@@ -47,6 +50,7 @@ def import_nud_model(
                 armature,
                 bone_names,
                 database,
+                use_advanced_nodes,
             )
 
     return armature
@@ -61,6 +65,7 @@ def import_mesh(
     armature: Optional[bpy.types.Object],
     bone_names: list[str],
     database: sm4sh_model_py.database.ShaderDatabase,
+    use_advanced_nodes: bool,
 ):
     # Match Blender's naming conventions to preserve order for export.
     name = f"{group.name}.{i:03}" if i > 0 else group.name
@@ -107,13 +112,21 @@ def import_mesh(
     blender_mesh.transform(y_up_to_z_up)
 
     if material := mesh.material1:
-        blender_mesh.materials.append(import_material(material, database))
+        blender_mesh.materials.append(
+            import_material(material, database, use_advanced_nodes)
+        )
     if material := mesh.material2:
-        blender_mesh.materials.append(import_material(material, database))
+        blender_mesh.materials.append(
+            import_material(material, database, use_advanced_nodes)
+        )
     if material := mesh.material3:
-        blender_mesh.materials.append(import_material(material, database))
+        blender_mesh.materials.append(
+            import_material(material, database, use_advanced_nodes)
+        )
     if material := mesh.material4:
-        blender_mesh.materials.append(import_material(material, database))
+        blender_mesh.materials.append(
+            import_material(material, database, use_advanced_nodes)
+        )
 
     obj = bpy.data.objects.new(blender_mesh.name, blender_mesh)
 
@@ -232,101 +245,6 @@ def import_weight_groups(
             # TODO: Is there a faster way than setting weights per vertex?
             for weight in influence.weights:
                 group.add([weight.vertex_index], weight.weight, "REPLACE")
-
-
-def import_material(
-    material: sm4sh_model_py.NudMaterial,
-    database: sm4sh_model_py.database.ShaderDatabase,
-) -> bpy.types.Material:
-    name = f"{material.shader_id:08X}"
-    blender_material = bpy.data.materials.new(name)
-
-    # Use custom properties to preserve values that are hard to represent in Blender.
-    blender_material["src_factor"] = str(material.src_factor).removeprefix("SrcFactor.")
-    blender_material["dst_factor"] = str(material.dst_factor).removeprefix("DstFactor.")
-    blender_material["alpha_func"] = str(material.alpha_func).removeprefix("AlphaFunc.")
-    blender_material["cull_mode"] = str(material.cull_mode).removeprefix("CullMode.")
-
-    for prop in material.properties:
-        if prop.name == "NU_materialHash":
-            material_hash = float32_bits(prop.values[0])
-            blender_material["NU_materialHash"] = f"{material_hash:08X}"
-
-    blender_material.use_nodes = True
-    nodes = blender_material.node_tree.nodes
-    links = blender_material.node_tree.links
-
-    # Create the nodes from scratch to ensure the required nodes are present.
-    # This avoids hard coding names like "Material Output" that depend on the UI language.
-    nodes.clear()
-
-    bsdf = nodes.new("ShaderNodeBsdfPrincipled")
-    bsdf.location = (-300, 0)
-
-    output_node = nodes.new("ShaderNodeOutputMaterial")
-    output_node.location = (0, 0)
-
-    links.new(bsdf.outputs["BSDF"], output_node.inputs["Surface"])
-
-    # TODO: Does preserving the property order matter?
-    for i, prop in enumerate(material.properties):
-        if prop.name != "NU_materialHash":
-            # TODO: Custom node for xyzw values?
-            node = nodes.new("ShaderNodeRGB")
-            node.location = (-500, i * -200)
-
-            node.label = prop.name
-            node.outputs[0].default_value = prop.values[:4]
-
-    texture_nodes = []
-    for i, texture in enumerate(material.textures):
-        node = nodes.new("ShaderNodeTexImage")
-        node.label = str(i)
-        node.location = (-800, i * -300)
-
-        # TODO: Load global textures like color ramps.
-        image_name = f"{texture.hash:08X}"
-        image = bpy.data.images.get(image_name)
-        if image is None:
-            image = bpy.data.images.new(image_name, 4, 4, alpha=True)
-
-        node.image = image
-
-        # TODO: Error if U and V have the same wrap mode?
-        match texture.wrap_mode_s:
-            case sm4sh_model_py.WrapMode.Repeat:
-                node.extension = "REPEAT"
-            case sm4sh_model_py.WrapMode.MirroredRepeat:
-                node.extension = "MIRROR"
-            case sm4sh_model_py.WrapMode.ClampToEdge:
-                node.extension = "CLIP"
-
-        texture_nodes.append(node)
-
-    # Texture usage is determined by the compiled shaders.
-    # TODO: Generate shader nodes based on compiled code similar to xenoblade_blender.
-    if shader := database.get_shader(material.shader_id):
-        for name, node in zip(shader.samplers.values(), texture_nodes):
-            match name:
-                case "colorSampler":
-                    # TODO: Is this gamma handling part of the compiled shader code?
-                    node.image.colorspace_settings.name = "sRGB"
-                    links.new(node.outputs["Color"], bsdf.inputs["Base Color"])
-                case "normalSampler":
-                    normal = nodes.new("ShaderNodeNormalMap")
-                    normal.location = (-300, -400)
-                    links.new(node.outputs["Color"], normal.inputs["Color"])
-                    links.new(normal.outputs["Normal"], bsdf.inputs["Normal"])
-                case "reflectionSampler":
-                    pass
-                case "reflectionCubeSampler":
-                    pass
-
-    return blender_material
-
-
-def float32_bits(f: float) -> int:
-    return struct.unpack("@I", struct.pack("@f", f))[0]
 
 
 def import_image(image: sm4sh_model_py.ImageTexture, png: bytes):

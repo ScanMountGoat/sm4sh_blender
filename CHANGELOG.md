@@ -3,6 +3,10 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## unreleased
+### Added
+* Added an import option for recreating in game shaders with Blender's material nodes. This option is still experimental and disabled by default.
+
 ## 0.2.1 - 2025-11-12
 ### Fixed
 * Fixed a compatibility issue preventing animation import in Blender 5.0.

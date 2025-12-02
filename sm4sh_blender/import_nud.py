@@ -28,6 +28,12 @@ class ImportNud(bpy.types.Operator, ImportHelper):
         maxlen=255,
     )
 
+    experimental_shader_nodes: BoolProperty(
+        name="Experimental Shader Nodes",
+        description="Recreate shader nodes from in game compiled shaders (experimental)",
+        default=False,
+    )
+
     def execute(self, context: bpy.types.Context):
         init_logging()
 
@@ -44,7 +50,7 @@ class ImportNud(bpy.types.Operator, ImportHelper):
 
         model = sm4sh_model_py.load_model(path)
 
-        database_path = os.path.join(os.path.dirname(__file__), "shaders.json")
+        database_path = os.path.join(os.path.dirname(__file__), "shaders.bin")
         database = sm4sh_model_py.database.ShaderDatabase.from_file(database_path)
 
         end = time.time()
@@ -53,7 +59,9 @@ class ImportNud(bpy.types.Operator, ImportHelper):
         start = time.time()
 
         try:
-            armature = import_nud_model(self, context, model, database)
+            armature = import_nud_model(
+                self, context, model, database, self.experimental_shader_nodes
+            )
             if armature is not None:
                 # Store the path to make exporting easier later.
                 armature["original_nud"] = path
