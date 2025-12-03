@@ -145,7 +145,11 @@ def import_mesh(
         vertex_group = obj.vertex_groups.new(name=parent_bone_name)
         vertex_group.add(indices.tolist(), 1.0, "REPLACE")
     elif bones := mesh.vertices.bones:
-        import_weight_groups(obj, bones.bone_indices, bones.weights, bone_names)
+        if armature is not None:
+            import_weight_groups(obj, bones.bone_indices, bones.weights, bone_names)
+        else:
+            message = f"Vertex groups for {group.name} cannot be imported without a skeleton file. Ensure the model.vbn is in the same folder."
+            raise ImportException(message)
 
     collection.objects.link(obj)
 
