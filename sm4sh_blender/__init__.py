@@ -4,7 +4,7 @@ bl_info = {
     "name": "Sm4sh Blender",
     "description": "Import and export Smash 4 models and animations",
     "author": "ScanMountGoat (SMG)",
-    "version": (0, 2, 1),
+    "version": (0, 3, 0),
     "blender": (4, 1, 0),
     "location": "File > Import-Export",
     "warning": "",
