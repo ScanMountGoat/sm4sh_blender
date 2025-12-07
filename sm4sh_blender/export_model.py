@@ -268,9 +268,31 @@ def export_mesh_inner(
         skin_weights = sm4sh_model_py.skinning.SkinWeights.from_influences(
             influences, positions.shape[0], bone_names
         )
+        # Blender doesn't enforce normalization, since it normalizes while animating.
+        # Normalize on export to ensure the weights work correctly in game.
+        # TODO: move this normalization to sm4sh_model
+        bone_weights = np.floor(skin_weights.bone_weights * 255.0).astype(np.uint8)
+        for i in range(bone_weights.shape[0]):
+            # Normalize the integ integers with the remainder since we use uint8 for the vertex buffer.
+            # This ensures the result after decoding to float is actually normalized.
+            # https://stackoverflow.com/questions/31121591/normalizing-integers
+            total = sum(bone_weights[i])
+            remainder = 0
+            if total > 0:
+                for j in range(bone_weights.shape[1]):
+                    count = bone_weights[i, j] * 255 + remainder
+                    bone_weights[i, j] = count // total
+                    remainder = count % total
+
+        # Convert back to floating point.
+        bone_weights = bone_weights.astype(np.float32) / 255.0
+
+        weight_sums = bone_weights.sum(axis=1)
+        print(weight_sums[weight_sums != 1.0])
+
         bones = sm4sh_model_py.vertex.Bones(
             skin_weights.bone_indices,
-            skin_weights.bone_weights,
+            bone_weights,
             sm4sh_model_py.vertex.BoneElementType.Byte,
         )
     elif len(influences) == 1:
@@ -346,13 +368,8 @@ def export_influences(
     group_to_weights = {vg.index: (vg.name, []) for vg in blender_mesh.vertex_groups}
 
     for vertex in mesh_data.vertices:
-        # Blender doesn't enforce normalization, since it normalizes while animating.
-        # Normalize on export to ensure the weights work correctly in game.
-        weight_sum = sum([g.weight for g in vertex.groups])
         for group in vertex.groups:
-            weight = sm4sh_model_py.skinning.VertexWeight(
-                vertex.index, group.weight / weight_sum
-            )
+            weight = sm4sh_model_py.skinning.VertexWeight(vertex.index, group.weight)
             group_to_weights[group.group][1].append(weight)
 
     influences = []
