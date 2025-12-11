@@ -312,7 +312,6 @@ def export_mesh_inner(
     material3 = None
     material4 = None
     for i, material in enumerate(mesh_data.materials):
-
         if i == 0:
             material1 = export_material(material)
         elif i == 1:
@@ -326,8 +325,10 @@ def export_mesh_inner(
             break
 
     if material1 is None:
-        # TODO: warning?
         material1 = default_material()
+
+        message = f"Mesh {blender_mesh.name} has no materials and will export with a default material."
+        operator.report({"WARNING"}, message)
 
     mesh = sm4sh_model_py.NudMesh(
         vertices,
@@ -572,6 +573,7 @@ def default_material() -> sm4sh_model_py.NudMaterial:
         sm4sh_model_py.SrcFactor.One,
         sm4sh_model_py.DstFactor.Zero,
         sm4sh_model_py.AlphaFunc.Disabled,
+        0,
         sm4sh_model_py.CullMode.Inside,
         [
             sm4sh_model_py.NudTexture(
