@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## unreleased
+### Changed
+* Changed nud export to report a warning if a mesh does not have all attributes required by the shaders.
+
 ### Fixed
 * Fixed an issue where default material creation would fail whenn exporting meshes with no material assigned.
 

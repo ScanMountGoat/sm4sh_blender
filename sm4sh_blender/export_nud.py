@@ -65,6 +65,9 @@ def export_nud(
 ):
     start = time.time()
 
+    database_path = os.path.join(os.path.dirname(__file__), "shaders.bin")
+    database = sm4sh_model_py.database.ShaderDatabase.from_file(database_path)
+
     sorted_objects = []
     if len(context.selected_objects) == 1:
         if original_nud_path == "":
@@ -101,7 +104,7 @@ def export_nud(
     for name, objects in itertools.groupby(sorted_objects, key=extract_object_name):
         meshes_parent_indices = []
         for o in objects:
-            mesh_parent_index = export_mesh(context, operator, o, bone_names)
+            mesh_parent_index = export_mesh(context, operator, o, bone_names, database)
             meshes_parent_indices.append(mesh_parent_index)
 
         # Split since each group can only have one parent bone.

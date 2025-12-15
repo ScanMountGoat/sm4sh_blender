@@ -213,6 +213,7 @@ def export_mesh(
     operator: bpy.types.Operator,
     blender_mesh: bpy.types.Object,
     bone_names: list[str],
+    database: sm4sh_model_py.database.ShaderDatabase,
 ) -> Tuple[sm4sh_model_py.NudMesh, Optional[int]]:
     # Work on a copy in case we need to make any changes.
     mesh_copy = blender_mesh.copy()
@@ -220,7 +221,9 @@ def export_mesh(
 
     try:
         process_export_mesh(context, mesh_copy)
-        return export_mesh_inner(operator, mesh_copy, blender_mesh.name, bone_names)
+        return export_mesh_inner(
+            operator, mesh_copy, blender_mesh.name, bone_names, database
+        )
     finally:
         bpy.data.meshes.remove(mesh_copy.data)
 
@@ -231,6 +234,7 @@ def export_mesh_inner(
     blender_mesh: bpy.types.Object,
     mesh_name: str,
     bone_names: list[str],
+    database: sm4sh_model_py.database.ShaderDatabase,
 ) -> Tuple[sm4sh_model_py.NudMesh, Optional[int]]:
 
     mesh_data: bpy.types.Mesh = blender_mesh.data
@@ -265,7 +269,7 @@ def export_mesh_inner(
             raise ExportException(message)
 
     if len(influences) > 1:
-        # Blender doesn't enforce normalization, since it normalizes while animating.
+        # Blender normalizes while animating, so weights may not be normalized.
         # sm4sh_model_py needs the element type to properly normalize weights.
         bone_element_type = sm4sh_model_py.vertex.BoneElementType.Byte
         skin_weights = sm4sh_model_py.skinning.SkinWeights.from_influences(
@@ -298,6 +302,7 @@ def export_mesh_inner(
             float_colors = export_color_attribute(
                 mesh_name, mesh_data, vertex_indices, color_attribute
             )
+            break
 
     color_type = sm4sh_model_py.vertex.ColorElementType.Byte
     colors = sm4sh_model_py.vertex.Colors(float_colors, color_type)
@@ -323,6 +328,41 @@ def export_mesh_inner(
         elif i > 3:
             # TODO: Warning?
             break
+
+    # Validate attributes against the shaders.
+    # Missing required attributes default to 0 in game and may cause rendering issues.
+    # TODO: Dont export attributes that aren't required?
+    expected_uv_count = 0
+    requires_vertex_color = False
+    for material in [material1, material2, material3, material4]:
+        if material is not None:
+            if shader := database.get_shader(material.shader_id):
+                for attribute in shader.attributes:
+                    match attribute:
+                        case "a_Position":
+                            pass
+                        case "a_Normal":
+                            pass
+                        case "a_Tangent":
+                            pass
+                        case "a_Binormal":
+                            pass
+                        case "a_Color":
+                            requires_vertex_color = True
+                        case "a_TexCoord0":
+                            expected_uv_count = max(expected_uv_count, 1)
+                        case "a_TexCoord1":
+                            expected_uv_count = max(expected_uv_count, 2)
+                        case "a_TexCoord2":
+                            expected_uv_count = max(expected_uv_count, 3)
+
+    actual_uv_count = len(uv_layers)
+    if actual_uv_count < expected_uv_count:
+        message = f"Expected {expected_uv_count} UV maps for {blender_mesh.name} but found {actual_uv_count}."
+        operator.report({"WARNING"}, message)
+
+    if requires_vertex_color:
+        pass
 
     if material1 is None:
         material1 = default_material()
@@ -444,6 +484,9 @@ def export_uv_layer(mesh_data, positions, vertex_indices, uv_layer):
 
 
 def export_material(material: bpy.types.Material) -> sm4sh_model_py.NudMaterial:
+    # TODO: validate material textures and properties against the shader.
+    # TODO: warn or error for extra properties and missing properties?
+
     # TODO: Better error handling
     flags = 0x94010161
     flags_name = extract_name(material.name, ".")
