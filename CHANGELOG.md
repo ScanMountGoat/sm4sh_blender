@@ -5,6 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## unreleased
 ### Changed
+* Changed supported Blender version to 5.1 or later.
 * Changed nud export to report a warning if a mesh does not have all attributes required by the shaders.
 
 ### Fixed

@@ -67,9 +67,7 @@ def import_pac(operator: bpy.types.Operator, context: bpy.types.Context, path: s
     for name, animation in animations:
         action = import_animation(armature, skeleton, bone_names, name, animation)
         armature.animation_data.action = action
-        if bpy.app.version >= (4, 4, 0):
-            # Automatic slot assignment works differently on 5.0 or later.
-            armature.animation_data.action_slot = action.slots[0]
+        armature.animation_data.action_slot = action.slots[0]
 
     end = time.time()
     print(f"Import Blender Animation: {end - start}")
@@ -133,24 +131,20 @@ def set_fcurves_component(
 def create_fcurve(
     action, data_path: str, index: int, group_name: str
 ) -> bpy.types.FCurve:
-    if bpy.app.version >= (5, 0, 0):
-        # Blender 5.0 removes the legacy Action API.
-        if len(action.layers) == 0:
-            layer = action.layers.new("Layer")
-        else:
-            layer = action.layers[0]
-
-        if len(layer.strips) == 0:
-            strip = layer.strips.new(type="KEYFRAME")
-        else:
-            strip = layer.strips[0]
-
-        if len(action.slots) == 0:
-            slot = action.slots.new(id_type="OBJECT", name="Legacy Slot")
-        else:
-            slot = action.slots[0]
-
-        channelbag = strip.channelbag(slot, ensure=True)
-        return channelbag.fcurves.new(data_path, index=index, group_name=group_name)
+    if len(action.layers) == 0:
+        layer = action.layers.new("Layer")
     else:
-        return action.fcurves.new(data_path, index=index, action_group=group_name)
+        layer = action.layers[0]
+
+    if len(layer.strips) == 0:
+        strip = layer.strips.new(type="KEYFRAME")
+    else:
+        strip = layer.strips[0]
+
+    if len(action.slots) == 0:
+        slot = action.slots.new(id_type="OBJECT", name="Legacy Slot")
+    else:
+        slot = action.slots[0]
+
+    channelbag = strip.channelbag(slot, ensure=True)
+    return channelbag.fcurves.new(data_path, index=index, group_name=group_name)
