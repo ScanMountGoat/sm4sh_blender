@@ -214,6 +214,7 @@ def export_mesh(
     blender_mesh: bpy.types.Object,
     bone_names: list[str],
     database: sm4sh_model_py.database.ShaderDatabase,
+    image_args: dict[int, sm4sh_model_py.EncodeSurfaceRgba32FloatArgs],
 ) -> Tuple[sm4sh_model_py.NudMesh, Optional[int]]:
     # Work on a copy in case we need to make any changes.
     mesh_copy = blender_mesh.copy()
@@ -222,7 +223,7 @@ def export_mesh(
     try:
         process_export_mesh(context, mesh_copy)
         return export_mesh_inner(
-            operator, mesh_copy, blender_mesh.name, bone_names, database
+            operator, mesh_copy, blender_mesh.name, bone_names, database, image_args
         )
     finally:
         bpy.data.meshes.remove(mesh_copy.data)
@@ -235,6 +236,7 @@ def export_mesh_inner(
     mesh_name: str,
     bone_names: list[str],
     database: sm4sh_model_py.database.ShaderDatabase,
+    image_args: dict[int, sm4sh_model_py.EncodeSurfaceRgba32FloatArgs],
 ) -> Tuple[sm4sh_model_py.NudMesh, Optional[int]]:
 
     mesh_data: bpy.types.Mesh = blender_mesh.data
@@ -318,13 +320,13 @@ def export_mesh_inner(
     material4 = None
     for i, material in enumerate(mesh_data.materials):
         if i == 0:
-            material1 = export_material(material)
+            material1 = export_material(material, image_args)
         elif i == 1:
-            material2 = export_material(material)
+            material2 = export_material(material, image_args)
         elif i == 2:
-            material3 = export_material(material)
+            material3 = export_material(material, image_args)
         elif i == 3:
-            material4 = export_material(material)
+            material4 = export_material(material, image_args)
         elif i > 3:
             # TODO: Warning?
             break
@@ -483,7 +485,10 @@ def export_uv_layer(mesh_data, positions, vertex_indices, uv_layer):
     return uvs
 
 
-def export_material(material: bpy.types.Material) -> sm4sh_model_py.NudMaterial:
+def export_material(
+    material: bpy.types.Material,
+    image_args: dict[int, sm4sh_model_py.EncodeSurfaceRgba32FloatArgs],
+) -> sm4sh_model_py.NudMaterial:
     # TODO: validate material textures and properties against the shader.
     # TODO: warn or error for extra properties and missing properties?
 
@@ -558,6 +563,14 @@ def export_material(material: bpy.types.Material) -> sm4sh_model_py.NudMaterial:
                     )
                     texture_indices_textures.append((texture_index, texture))
 
+                    # TODO: only export the image if not already present.
+                    # TODO: skip global texture hashes
+                    image_args[hash] = export_image(node.image, hash)
+                else:
+                    # TODO: report error if the name is not valid
+                    # TODO: use a default name?
+                    pass
+
     # The texture order matters.
     texture_indices_textures.sort(key=lambda x: x[0])
     textures = [texture for _, texture in texture_indices_textures]
@@ -581,6 +594,30 @@ def export_material(material: bpy.types.Material) -> sm4sh_model_py.NudMaterial:
         cull_mode,
         textures,
         properties,
+    )
+
+
+def export_image(image: bpy.types.Image, hash: int):
+    # TODO: how to choose the output format and mipmaps?
+    width, height = image.size
+    image_data = np.zeros(width * height * 4, dtype=np.float32)
+    image.pixels.foreach_get(image_data)
+
+    # Flip vertically to match in game.
+    image_data = np.flip(
+        image_data.reshape((height, width, 4)),
+        axis=0,
+    )
+
+    # TODO: detect cube maps based on naming conventions
+    return sm4sh_model_py.EncodeSurfaceRgba32FloatArgs(
+        hash,
+        width,
+        height,
+        1,
+        sm4sh_model_py.NutFormat.Rgba8Unorm,
+        True,
+        image_data.reshape(-1),
     )
 
 

@@ -94,17 +94,25 @@ def export_nud(
     if original_model is not None and original_model.skeleton is not None:
         bone_names = [b.name for b in original_model.skeleton.bones]
 
+    image_textures = []
+    if original_model is not None:
+        image_textures = original_model.textures
+
+    image_args = {}
+
     # TODO: Export images?
     # TODO: Calculate better bounding sphere.
     groups = []
-    model = sm4sh_model_py.NudModel(groups, [], [0, 0, 0, 10.0], None)
+    model = sm4sh_model_py.NudModel(groups, image_textures, [0, 0, 0, 10.0], None)
 
     extract_object_name = lambda o: extract_name(o.name, ".")
 
     for name, objects in itertools.groupby(sorted_objects, key=extract_object_name):
         meshes_parent_indices = []
         for o in objects:
-            mesh_parent_index = export_mesh(context, operator, o, bone_names, database)
+            mesh_parent_index = export_mesh(
+                context, operator, o, bone_names, database, image_args
+            )
             meshes_parent_indices.append(mesh_parent_index)
 
         # Split since each group can only have one parent bone.
@@ -131,9 +139,20 @@ def export_nud(
     print(f"Create NudModel: {end - start}")
 
     start = time.time()
+    # In game nut files sort textures by their integer hash.
+    image_args = sorted(image_args.values(), key=lambda x: x.hash_id)
+    model.textures = sm4sh_model_py.encode_images_rgbaf32(image_args)
+    end = time.time()
+    print(f"Encode Images: {end - start}")
+
+    start = time.time()
 
     nud = model.to_nud()
     nud.save(output_nud_path)
+
+    # TODO: make this optional
+    nut = model.to_nut()
+    nut.save(output_nud_path.replace(".nud", ".nut"))
 
     end = time.time()
     print(f"Export Files: {end - start}")
