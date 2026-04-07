@@ -3,6 +3,10 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## unreleased
+### Added
+* Added support for exporting textures to a model.nut file on export.
+
 ## 0.4.0 - 2026-03-17
 ### Changed
 * Changed supported Blender version to 5.1 or later.
