@@ -81,6 +81,11 @@ def register():
         description="The texture dimension for the exported model.nut",
         default="2D",
     )
+    bpy.types.Image.sm4sh_generate_mipmaps = bpy.props.BoolProperty(
+        name="Generate Mipmaps",
+        description="Generate mipmaps for the exported model.nut",
+        default=True,
+    )
 
 
 def unregister():

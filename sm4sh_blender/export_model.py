@@ -636,7 +636,7 @@ def export_image(image: bpy.types.Image, hash: int):
         nut_format = sm4sh_model_py.NutFormat.Bgr5A1Unorm
 
     layers = 1
-    generate_mipmaps = True
+    generate_mipmaps = image.sm4sh_generate_mipmaps
     if image.sm4sh_image_dimension == "Cube":
         # TODO: Fix mipmaps for cube maps.
         layers = 6

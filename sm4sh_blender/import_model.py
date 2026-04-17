@@ -273,9 +273,12 @@ def import_image(image: sm4sh_model_py.ImageTexture, png: bytes):
     blender_image.sm4sh_image_format = str(image.image_format).removeprefix(
         "NutFormat."
     )
+
     if image.layers == 6:
         blender_image.sm4sh_image_dimension = "Cube"
     else:
         blender_image.sm4sh_image_dimension = "2D"
+
+    blender_image.sm4sh_generate_mipmaps = image.mipmap_count > 1
 
     return blender_image

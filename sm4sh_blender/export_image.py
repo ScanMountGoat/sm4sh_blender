@@ -18,4 +18,4 @@ class SM4SH_PT_image_export_panel(bpy.types.Panel):
             layout = self.layout
             layout.prop(image, "sm4sh_image_format", text="Format")
             layout.prop(image, "sm4sh_image_dimension", text="Dimension")
-            # TODO: mipmaps
+            layout.prop(image, "sm4sh_generate_mipmaps", text="Generate Mipmaps")
