@@ -266,4 +266,13 @@ def import_image(image: sm4sh_model_py.ImageTexture, png: bytes):
     # Necessary for 0 alpha to not set RGB to black.
     blender_image.alpha_mode = "CHANNEL_PACKED"
 
+    # Set custom properties to match the original image on export.
+    blender_image.sm4sh_image_format = str(image.image_format).removeprefix(
+        "NutFormat."
+    )
+    if image.layers == 6:
+        blender_image.sm4sh_image_dimension = "Cube"
+    else:
+        blender_image.sm4sh_image_dimension = "2D"
+
     return blender_image

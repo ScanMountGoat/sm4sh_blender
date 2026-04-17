@@ -498,21 +498,24 @@ def export_material(
     if value := parse_int(flags_name, 16):
         flags = value
 
-    src_factor = sm4sh_model_py.SrcFactor.One
-    if value := get_enum_value(material, "src_factor", sm4sh_model_py.SrcFactor):
-        src_factor = value
+    src_factor = get_enum_value(
+        material, "src_factor", sm4sh_model_py.SrcFactor, sm4sh_model_py.SrcFactor.One
+    )
 
-    dst_factor = sm4sh_model_py.DstFactor.Zero
-    if value := get_enum_value(material, "dst_factor", sm4sh_model_py.DstFactor):
-        dst_factor = value
+    dst_factor = get_enum_value(
+        material, "dst_factor", sm4sh_model_py.DstFactor, sm4sh_model_py.DstFactor.Zero
+    )
 
-    alpha_func = sm4sh_model_py.AlphaFunc.Disabled
-    if value := get_enum_value(material, "alpha_func", sm4sh_model_py.AlphaFunc):
-        alpha_func = value
+    alpha_func = get_enum_value(
+        material,
+        "alpha_func",
+        sm4sh_model_py.AlphaFunc,
+        sm4sh_model_py.AlphaFunc.Disabled,
+    )
 
-    cull_mode = sm4sh_model_py.CullMode.Inside
-    if value := get_enum_value(material, "cull_mode", sm4sh_model_py.CullMode):
-        cull_mode = value
+    cull_mode = get_enum_value(
+        material, "cull_mode", sm4sh_model_py.CullMode, sm4sh_model_py.CullMode.Inside
+    )
 
     properties = []
     texture_indices_textures = []
@@ -598,7 +601,6 @@ def export_material(
 
 
 def export_image(image: bpy.types.Image, hash: int):
-    # TODO: how to choose the output format and mipmaps?
     width, height = image.size
     image_data = np.zeros(width * height * 4, dtype=np.float32)
     image.pixels.foreach_get(image_data)
@@ -609,27 +611,31 @@ def export_image(image: bpy.types.Image, hash: int):
         axis=0,
     )
 
-    # TODO: detect cube maps based on naming conventions
+    # TODO: set cube map and mipmaps
+    nut_format = get_enum_value(
+        image,
+        "sm4sh_image_format",
+        sm4sh_model_py.NutFormat,
+        sm4sh_model_py.NutFormat.BC3Unorm,
+    )
+
     return sm4sh_model_py.EncodeSurfaceRgba32FloatArgs(
         hash,
         width,
         height,
         1,
-        sm4sh_model_py.NutFormat.Rgba8Unorm,
+        nut_format,
         True,
         image_data.reshape(-1),
     )
 
 
-def get_enum_value(material, name: str, enum):
-    if value := material.get(name):
-        try:
-            value = getattr(enum, value)
-            return value
-        except:
-            return None
+def get_enum_value(obj, name: str, enum, default=None):
+    # Support custom properties like obj.custom_prop or obj["custom_prop"].
+    if value := getattr(obj, name, None) or obj.get(name):
+        return getattr(enum, value, default)
 
-    return None
+    return default
 
 
 def float32_from_bits(bits: int) -> float:
