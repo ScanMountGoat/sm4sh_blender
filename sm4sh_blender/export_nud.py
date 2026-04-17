@@ -113,7 +113,6 @@ def export_nud(
 
     image_args = {}
 
-    # TODO: Export images?
     # TODO: Calculate better bounding sphere.
     groups = []
     model = sm4sh_model_py.NudModel(groups, image_textures, [0, 0, 0, 10.0], None)

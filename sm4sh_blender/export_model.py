@@ -485,6 +485,19 @@ def export_uv_layer(mesh_data, positions, vertex_indices, uv_layer):
     return uvs
 
 
+global_texture_hashes = {
+    0x10000001,
+    0x10040000,
+    0x10040001,
+    0x10080000,
+    0x10100000,
+    0x10101000,
+    0x10102000,
+    0x10104100,
+    0x10104FFF,
+}
+
+
 def export_material(
     material: bpy.types.Material,
     image_args: dict[int, sm4sh_model_py.EncodeSurfaceRgba32FloatArgs],
@@ -566,9 +579,8 @@ def export_material(
                     )
                     texture_indices_textures.append((texture_index, texture))
 
-                    # TODO: only export the image if not already present.
-                    # TODO: skip global texture hashes
-                    image_args[hash] = export_image(node.image, hash)
+                    if hash not in image_args and hash not in global_texture_hashes:
+                        image_args[hash] = export_image(node.image, hash)
                 else:
                     # TODO: report error if the name is not valid
                     # TODO: use a default name?
