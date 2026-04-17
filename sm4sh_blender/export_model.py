@@ -619,6 +619,10 @@ def export_image(image: bpy.types.Image, hash: int):
         sm4sh_model_py.NutFormat.BC3Unorm,
     )
 
+    # sm4sh_lib swaps channels internally to support image_dds, so we need to change formats.
+    if nut_format == sm4sh_model_py.NutFormat.Rgb5A1Unorm:
+        nut_format = sm4sh_model_py.NutFormat.Bgr5A1Unorm
+
     layers = 1
     generate_mipmaps = True
     if image.sm4sh_image_dimension == "Cube":
