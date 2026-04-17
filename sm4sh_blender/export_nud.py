@@ -17,7 +17,7 @@ from .export_model import (
 from . import sm4sh_model_py
 
 from bpy_extras.io_utils import ExportHelper
-from bpy.props import StringProperty
+from bpy.props import StringProperty, BoolProperty
 
 
 class ExportNud(bpy.types.Operator, ExportHelper):
@@ -39,11 +39,23 @@ class ExportNud(bpy.types.Operator, ExportHelper):
         description="The original .nud file to use to generate the new model. Defaults to the armature's original_nud custom property if not set",
     )
 
+    export_nut: BoolProperty(
+        name="Export Nut",
+        description="Export a model.nut file with the textures used by each material",
+        default=True,
+    )
+
     def execute(self, context: bpy.types.Context):
         init_logging()
 
         try:
-            export_nud(self, context, self.filepath, self.original_nud.strip('"'))
+            export_nud(
+                self,
+                context,
+                self.filepath,
+                self.original_nud.strip('"'),
+                self.export_nut,
+            )
         except ExportException as e:
             self.report({"ERROR"}, str(e))
             return {"FINISHED"}
@@ -62,6 +74,7 @@ def export_nud(
     context: bpy.types.Context,
     output_nud_path: str,
     original_nud_path: str,
+    export_nut: bool,
 ):
     start = time.time()
 
@@ -120,6 +133,7 @@ def export_nud(
             meshes_parent_indices, key=lambda o: o[1]
         ):
             # TODO: Calculate better bounding sphere.
+            # TODO: sort bias?
             meshes = [mesh for mesh, _ in meshes_parents]
             group = sm4sh_model_py.NudMeshGroup(
                 name,
@@ -138,21 +152,22 @@ def export_nud(
     end = time.time()
     print(f"Create NudModel: {end - start}")
 
-    start = time.time()
-    # In game nut files sort textures by their integer hash.
-    image_args = sorted(image_args.values(), key=lambda x: x.hash_id)
-    model.textures = sm4sh_model_py.encode_images_rgbaf32(image_args)
-    end = time.time()
-    print(f"Encode Images: {end - start}")
+    if export_nut:
+        start = time.time()
+        # In game nut files sort textures by their integer hash.
+        image_args = sorted(image_args.values(), key=lambda x: x.hash_id)
+        model.textures = sm4sh_model_py.encode_images_rgbaf32(image_args)
+        end = time.time()
+        print(f"Encode Images: {end - start}")
 
     start = time.time()
 
     nud = model.to_nud()
     nud.save(output_nud_path)
 
-    # TODO: make this optional
-    nut = model.to_nut()
-    nut.save(output_nud_path.replace(".nud", ".nut"))
+    if export_nut:
+        nut = model.to_nut()
+        nut.save(output_nud_path.replace(".nud", ".nut"))
 
     end = time.time()
     print(f"Export Files: {end - start}")
