@@ -254,7 +254,10 @@ def import_weight_groups(
 def import_image(image: sm4sh_model_py.ImageTexture, png: bytes):
     name = f"{image.hash_id:08X}"
 
-    blender_image = bpy.data.images.new(name, image.width, image.height, alpha=True)
+    # Depth and array layers are stacked vertically when converting to 2D.
+    blender_image = bpy.data.images.new(
+        name, image.width, image.height * image.layers, alpha=True
+    )
 
     # Loading png bytes is faster than foreach_set with a float buffer.
     blender_image.pack(data=png, data_len=len(png))

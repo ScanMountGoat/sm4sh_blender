@@ -611,7 +611,7 @@ def export_image(image: bpy.types.Image, hash: int):
         axis=0,
     )
 
-    # TODO: set cube map and mipmaps
+    # TODO: set mipmaps
     nut_format = get_enum_value(
         image,
         "sm4sh_image_format",
@@ -619,13 +619,22 @@ def export_image(image: bpy.types.Image, hash: int):
         sm4sh_model_py.NutFormat.BC3Unorm,
     )
 
+    layers = 1
+    generate_mipmaps = True
+    if image.sm4sh_image_dimension == "Cube":
+        # TODO: Fix mipmaps for cube maps.
+        layers = 6
+        generate_mipmaps = False
+
+    # Depth and array layers are stacked vertically when converting to 2D.
+    # TODO: Error if cube dimensions are not as expected?
     return sm4sh_model_py.EncodeSurfaceRgba32FloatArgs(
         hash,
         width,
-        height,
-        1,
+        height // layers,
+        layers,
         nut_format,
-        True,
+        generate_mipmaps,
         image_data.reshape(-1),
     )
 

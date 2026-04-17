@@ -59,8 +59,8 @@ def register():
     bpy.types.Image.sm4sh_image_dimension = bpy.props.EnumProperty(
         name="Texture Dimension",
         items=[
-            ("2D", "2D", ""),
-            ("Cube", "Cube", ""),
+            ("2D", "2D", "2D image"),
+            ("Cube", "Cube", "2D images stacked vertically for X+, X-, Y+, Y-, Z+, Z-"),
         ],
         description="The texture dimension for the exported model.nut",
         default="2D",
