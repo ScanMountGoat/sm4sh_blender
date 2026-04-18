@@ -487,6 +487,7 @@ def export_uv_layer(mesh_data, positions, vertex_indices, uv_layer):
 
 global_texture_hashes = {
     0x10000001,
+    0x10000007,
     0x10040000,
     0x10040001,
     0x10080000,

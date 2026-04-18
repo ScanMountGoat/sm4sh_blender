@@ -33,6 +33,11 @@ def import_nud_model(
     for texture, png in zip(model.textures, pngs):
         import_image(texture, png)
 
+    global_textures = sm4sh_model_py.texture.global_textures()
+    global_pngs = sm4sh_model_py.decode_images_png(global_textures)
+    for texture, png in zip(global_textures, global_pngs):
+        import_image(texture, png)
+
     armature = None
     bone_names = []
     if model.skeleton is not None:

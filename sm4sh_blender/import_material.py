@@ -104,7 +104,6 @@ def create_material_basic(
         node.label = str(i)
         node.location = (-800, i * -300)
 
-        # TODO: Load global textures like color ramps.
         image_name = f"{texture.hash:08X}"
         image = bpy.data.images.get(image_name)
         if image is None:
@@ -270,10 +269,11 @@ def update_material(
 
     for texture, name in zip(material.textures, shader.samplers):
         if node := nodes.get(name):
-            # TODO: Load global textures like color ramps.
             image_name = f"{texture.hash:08X}"
             image = bpy.data.images.get(image_name)
             if image is None:
+                # Create a blank image to preserve the texture hash for material export.
+                # TODO: report a warning that the texture is not a global texture or in the model.nut
                 image = bpy.data.images.new(image_name, 4, 4, alpha=True)
 
             node.image = image
