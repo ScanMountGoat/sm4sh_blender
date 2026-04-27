@@ -244,11 +244,11 @@ def metal_material(
     if normal_texture is not None:
         return sm4sh_model_py.NudMaterial(
             0x9601106B,
-            sm4sh_model_py.SrcFactor.One,
-            sm4sh_model_py.DstFactor.Zero,
-            sm4sh_model_py.AlphaFunc.Disabled,
-            0,
-            sm4sh_model_py.CullMode.Inside,
+            material.src_factor,
+            material.dst_factor,
+            material.alpha_func,
+            material.alpha_test_ref,
+            material.cull_mode,
             [
                 default_texture(0x10104FFF),
                 default_texture(0x10102000),
@@ -260,11 +260,11 @@ def metal_material(
     else:
         return sm4sh_model_py.NudMaterial(
             0x96011069,
-            sm4sh_model_py.SrcFactor.One,
-            sm4sh_model_py.DstFactor.Zero,
-            sm4sh_model_py.AlphaFunc.Disabled,
-            0,
-            sm4sh_model_py.CullMode.Inside,
+            material.src_factor,
+            material.dst_factor,
+            material.alpha_func,
+            material.alpha_test_ref,
+            material.cull_mode,
             [
                 default_texture(0x10104FFF),
                 default_texture(0x10102000),
