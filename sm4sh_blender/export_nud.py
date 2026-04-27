@@ -1,18 +1,13 @@
 import bpy
 import time
-import numpy as np
-from pathlib import Path
 import re
 import os
 import itertools
 
 from sm4sh_blender.import_model import init_logging
+from sm4sh_blender.utils import extract_name
 
-from .export_model import (
-    ExportException,
-    export_mesh,
-    extract_name,
-)
+from .export_model import ExportException, export_mesh
 
 from . import sm4sh_model_py
 
@@ -163,6 +158,8 @@ def export_nud(
 
     nud = model.to_nud()
     nud.save(output_nud_path)
+
+    # TODO: make a metal.nud
 
     if export_nut:
         nut = model.to_nut()
