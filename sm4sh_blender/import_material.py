@@ -310,51 +310,6 @@ def material_images_samplers(material, blender_images, samplers):
     return material_textures
 
 
-def assign_normal_map(
-    nodes,
-    links,
-    bsdf,
-    x_assignment: Optional[int],
-    y_assignment: Optional[int],
-    intensity_assignment: Optional[int],
-    expr_outputs: list[Optional[Tuple[bpy.types.Node, str]]],
-) -> Optional[bpy.types.Node]:
-    if x_assignment is None or y_assignment is None:
-        return None
-
-    normals = create_node_group(
-        nodes, "NormalMapXYFinal", normal_map_xy_final_node_group
-    )
-    normals.inputs["X"].default_value = 0.5
-    normals.inputs["Y"].default_value = 0.5
-    normals.inputs["Strength"].default_value = 1.0
-
-    assign_index(
-        x_assignment,
-        expr_outputs,
-        links,
-        normals.inputs["X"],
-    )
-    assign_index(
-        y_assignment,
-        expr_outputs,
-        links,
-        normals.inputs["Y"],
-    )
-
-    if intensity_assignment is not None:
-        assign_index(
-            intensity_assignment,
-            expr_outputs,
-            links,
-            normals.inputs["Strength"],
-        )
-
-    links.new(normals.outputs["Normal"], bsdf.inputs["Normal"])
-
-    return normals
-
-
 def assign_output(
     shader: sm4sh_model_py.database.ShaderProgram,
     expr: sm4sh_model_py.database.OutputExpr,

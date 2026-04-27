@@ -1,9 +1,12 @@
+from pathlib import Path
+
 import bpy
 import time
 import re
 import os
 import itertools
 
+from sm4sh_blender.export_material import metal_material
 from sm4sh_blender.import_model import init_logging
 from sm4sh_blender.utils import extract_name
 
@@ -40,6 +43,12 @@ class ExportNud(bpy.types.Operator, ExportHelper):
         default=True,
     )
 
+    export_metal: BoolProperty(
+        name="Export metal.nud",
+        description="Export a copy of the model.nud with metal box materials. Disable this setting when not exporting a fighter model.",
+        default=True,
+    )
+
     def execute(self, context: bpy.types.Context):
         init_logging()
 
@@ -50,6 +59,7 @@ class ExportNud(bpy.types.Operator, ExportHelper):
                 self.filepath,
                 self.original_nud.strip('"'),
                 self.export_nut,
+                self.export_metal,
             )
         except ExportException as e:
             self.report({"ERROR"}, str(e))
@@ -70,6 +80,7 @@ def export_nud(
     output_nud_path: str,
     original_nud_path: str,
     export_nut: bool,
+    export_metal: bool,
 ):
     start = time.time()
 
@@ -159,7 +170,11 @@ def export_nud(
     nud = model.to_nud()
     nud.save(output_nud_path)
 
-    # TODO: make a metal.nud
+    if export_metal:
+        # TODO: modify a copy?
+        make_metal(model, database)
+        metal_nud = model.to_nud()
+        metal_nud.save(str(Path(output_nud_path).with_name("metal.nud")))
 
     if export_nut:
         nut = model.to_nut()
@@ -167,3 +182,14 @@ def export_nud(
 
     end = time.time()
     print(f"Export Files: {end - start}")
+
+
+def make_metal(
+    model: sm4sh_model_py.NudModel,
+    database: sm4sh_model_py.database.ShaderDatabase,
+):
+    for group in model.groups:
+        for mesh in group.meshes:
+            # TODO: should every material be metal?
+            if mesh.material1 is not None:
+                mesh.material1 = metal_material(mesh.material1, database)

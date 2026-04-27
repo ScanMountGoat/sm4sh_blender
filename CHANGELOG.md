@@ -3,6 +3,10 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## unreleased
+### Added
+* Added support for exporting a generated metal.nud file on export.
+
 ## 0.5.0 - 2026-04-19
 ### Added
 * Added support for exporting textures to a model.nut file on export.

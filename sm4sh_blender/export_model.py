@@ -2,7 +2,7 @@ from typing import Optional, Tuple
 import bpy
 import math
 from mathutils import Matrix
-from sm4sh_blender.export_material import export_material
+from sm4sh_blender.export_material import default_material, export_material
 from . import sm4sh_model_py
 import numpy as np
 import bmesh
@@ -485,43 +485,3 @@ def export_uv_layer(mesh_data, positions, vertex_indices, uv_layer):
     return uvs
 
 
-def default_material() -> sm4sh_model_py.NudMaterial:
-    # TODO: investigate why texture mip settings can cause crashes.
-    return sm4sh_model_py.NudMaterial(
-        0x94010161,
-        sm4sh_model_py.SrcFactor.One,
-        sm4sh_model_py.DstFactor.Zero,
-        sm4sh_model_py.AlphaFunc.Disabled,
-        0,
-        sm4sh_model_py.CullMode.Inside,
-        [
-            sm4sh_model_py.NudTexture(
-                0x10080000,
-                sm4sh_model_py.MapMode.TexCoord,
-                sm4sh_model_py.WrapMode.ClampToEdge,
-                sm4sh_model_py.WrapMode.ClampToEdge,
-                sm4sh_model_py.MinFilter.Linear,
-                sm4sh_model_py.MagFilter.Linear,
-                sm4sh_model_py.MipDetail.OneMipLevelAnisotropicOff2,
-            ),
-            sm4sh_model_py.NudTexture(
-                0x10080000,
-                sm4sh_model_py.MapMode.TexCoord,
-                sm4sh_model_py.WrapMode.ClampToEdge,
-                sm4sh_model_py.WrapMode.ClampToEdge,
-                sm4sh_model_py.MinFilter.Linear,
-                sm4sh_model_py.MagFilter.Linear,
-                sm4sh_model_py.MipDetail.OneMipLevelAnisotropicOff2,
-            ),
-        ],
-        [
-            sm4sh_model_py.NudProperty("NU_colorSamplerUV", [1, 1, 0, 0]),
-            sm4sh_model_py.NudProperty("NU_fresnelColor", [1, 1, 1, 1]),
-            sm4sh_model_py.NudProperty("NU_blinkColor", [0, 0, 0, 0]),
-            sm4sh_model_py.NudProperty("NU_aoMinGain", [0, 0, 0, 0]),
-            sm4sh_model_py.NudProperty("NU_lightMapColorOffset", [0, 0, 0, 0]),
-            sm4sh_model_py.NudProperty("NU_fresnelParams", [1, 0, 0, 0]),
-            sm4sh_model_py.NudProperty("NU_alphaBlendParams", [0, 0, 0, 0]),
-            sm4sh_model_py.NudProperty("NU_materialHash", [0, 0, 0, 0]),
-        ],
-    )

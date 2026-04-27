@@ -177,3 +177,111 @@ def export_image(image: bpy.types.Image, hash: int):
         generate_mipmaps,
         image_data.reshape(-1),
     )
+
+
+def default_material() -> sm4sh_model_py.NudMaterial:
+    return sm4sh_model_py.NudMaterial(
+        0x94010161,
+        sm4sh_model_py.SrcFactor.One,
+        sm4sh_model_py.DstFactor.Zero,
+        sm4sh_model_py.AlphaFunc.Disabled,
+        0,
+        sm4sh_model_py.CullMode.Inside,
+        [
+            default_texture(0x10080000),
+            default_texture(0x10080000),
+        ],
+        [
+            sm4sh_model_py.NudProperty("NU_colorSamplerUV", [1, 1, 0, 0]),
+            sm4sh_model_py.NudProperty("NU_fresnelColor", [1, 1, 1, 1]),
+            sm4sh_model_py.NudProperty("NU_blinkColor", [0, 0, 0, 0]),
+            sm4sh_model_py.NudProperty("NU_aoMinGain", [0, 0, 0, 0]),
+            sm4sh_model_py.NudProperty("NU_lightMapColorOffset", [0, 0, 0, 0]),
+            sm4sh_model_py.NudProperty("NU_fresnelParams", [1, 0, 0, 0]),
+            sm4sh_model_py.NudProperty("NU_alphaBlendParams", [0, 0, 0, 0]),
+            sm4sh_model_py.NudProperty("NU_materialHash", [0, 0, 0, 0]),
+        ],
+    )
+
+
+def metal_material(
+    material: sm4sh_model_py.NudMaterial,
+    database: sm4sh_model_py.database.ShaderDatabase,
+) -> sm4sh_model_py.NudMaterial:
+    shader = database.get_shader(material.shader_id)
+
+    hash = 0.0
+    for p in material.properties:
+        if p.name == "NU_materialHash":
+            hash = p.values[0]
+
+    properties = [
+        sm4sh_model_py.NudProperty("NU_colorSamplerUV", [1, 1, 0, 0]),
+        sm4sh_model_py.NudProperty("NU_fresnelColor", [1, 1, 1, 1]),
+        sm4sh_model_py.NudProperty("NU_blinkColor", [0, 0, 0, 0]),
+        sm4sh_model_py.NudProperty("NU_reflectionColor", [3, 3, 3, 1]),
+        sm4sh_model_py.NudProperty("NU_aoMinGain", [0.3, 0.3, 0.3, 1]),
+        sm4sh_model_py.NudProperty("NU_lightMapColorOffset", [0, 0, 0, 0]),
+        sm4sh_model_py.NudProperty("NU_fresnelParams", [3.7, 0, 0, 0]),
+        sm4sh_model_py.NudProperty("NU_alphaBlendParams", [0, 0, 0, 0]),
+        sm4sh_model_py.NudProperty("NU_materialHash", [hash, 0, 0, 0]),
+    ]
+
+    # Texture usage is determined by the compiled shaders.
+    # Try and preserve the normal maps if present.
+    normal_texture = None
+    if shader is not None:
+        for texture, sampler in zip(material.textures, shader.samplers):
+            if sampler == "normalSampler":
+                # Preserve all normal map settings for wrap modes, filtering, etc.
+                normal_texture = texture
+                break
+
+    # TODO: investigate why texture mip settings can cause crashes.
+    # TODO: use 0x10080000 for diffuse and find material with diffuse color parameter?
+    # TODO: use existing nearly black texture instead?
+    # TODO: preserve alpha
+    if normal_texture is not None:
+        return sm4sh_model_py.NudMaterial(
+            0x9601106B,
+            sm4sh_model_py.SrcFactor.One,
+            sm4sh_model_py.DstFactor.Zero,
+            sm4sh_model_py.AlphaFunc.Disabled,
+            0,
+            sm4sh_model_py.CullMode.Inside,
+            [
+                default_texture(0x10104FFF),
+                default_texture(0x10102000),
+                normal_texture,
+                default_texture(0x10080000),
+            ],
+            properties,
+        )
+    else:
+        return sm4sh_model_py.NudMaterial(
+            0x96011069,
+            sm4sh_model_py.SrcFactor.One,
+            sm4sh_model_py.DstFactor.Zero,
+            sm4sh_model_py.AlphaFunc.Disabled,
+            0,
+            sm4sh_model_py.CullMode.Inside,
+            [
+                default_texture(0x10104FFF),
+                default_texture(0x10102000),
+                default_texture(0x10080000),
+            ],
+            properties,
+        )
+
+
+def default_texture(hash: int) -> sm4sh_model_py.NudTexture:
+    # TODO: investigate why texture mip settings can cause crashes.
+    return sm4sh_model_py.NudTexture(
+        hash,
+        sm4sh_model_py.MapMode.TexCoord,
+        sm4sh_model_py.WrapMode.ClampToEdge,
+        sm4sh_model_py.WrapMode.ClampToEdge,
+        sm4sh_model_py.MinFilter.Linear,
+        sm4sh_model_py.MagFilter.Linear,
+        sm4sh_model_py.MipDetail.OneMipLevelAnisotropicOff2,
+    )
