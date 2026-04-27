@@ -133,19 +133,37 @@ def export_nud(
             )
             meshes_parent_indices.append(mesh_parent_index)
 
-        # Split since each group can only have one parent bone.
-        for parent_bone_index, meshes_parents in itertools.groupby(
-            meshes_parent_indices, key=lambda o: o[1]
-        ):
-            # TODO: Calculate better bounding sphere.
-            # TODO: sort bias?
-            meshes = [mesh for mesh, _ in meshes_parents]
+        # TODO: Calculate better bounding sphere.
+        # TODO: preserve sort bias?
+
+        # Groups with the same name must have the same bone flags.
+        # This means the parent bone can't be used if any meshes need skinning.
+        if all(index is not None for _, index in meshes_parent_indices):
+            # Split since each group can only have one parent bone.
+            for parent_bone_index, split_meshes_parents in itertools.groupby(
+                meshes_parent_indices, key=lambda o: o[1]
+            ):
+                meshes = [mesh for mesh, _ in split_meshes_parents]
+                # Use the parent bone instead of skin weights.
+                for mesh in meshes:
+                    mesh.vertices.bones = None
+
+                group = sm4sh_model_py.NudMeshGroup(
+                    name,
+                    meshes,
+                    0.0,
+                    [0, 0, 0, 10.0],
+                    parent_bone_index,
+                )
+                groups.append(group)
+        else:
+            meshes = [mesh for mesh, _ in meshes_parent_indices]
             group = sm4sh_model_py.NudMeshGroup(
                 name,
                 meshes,
                 0.0,
                 [0, 0, 0, 10.0],
-                parent_bone_index,
+                None,
             )
             groups.append(group)
 

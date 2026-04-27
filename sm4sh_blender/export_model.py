@@ -270,7 +270,7 @@ def export_mesh_inner(
             message = f"Vertex group {influence.bone_name} for mesh {mesh_name} is not in the vbn bone list."
             raise ExportException(message)
 
-    if len(influences) > 1:
+    if len(influences) > 0:
         # Blender normalizes while animating, so weights may not be normalized.
         # sm4sh_model_py needs the element type to properly normalize weights.
         bone_element_type = sm4sh_model_py.vertex.BoneElementType.Byte
@@ -283,8 +283,9 @@ def export_mesh_inner(
             skin_weights.bone_weights,
             bone_element_type,
         )
-    elif len(influences) == 1:
-        # Avoid storing weights if there is only one influence.
+
+    if len(influences) == 1:
+        # Store information for a potential parent bone optimization for later.
         parent_name = influences[0].bone_name
         for i, name in enumerate(bone_names):
             if name == parent_name:
@@ -483,5 +484,3 @@ def export_uv_layer(mesh_data, positions, vertex_indices, uv_layer):
     uvs[:, 1] = 1.0 - uvs[:, 1]
 
     return uvs
-
-

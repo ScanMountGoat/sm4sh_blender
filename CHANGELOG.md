@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 * Added support for exporting a generated metal.nud file on export.
 
+### Fixed
+* Fixed an issue where exported nud models would have incorrect bone weights and parent bones in some cases.
+
 ## 0.5.0 - 2026-04-19
 ### Added
 * Added support for exporting textures to a model.nut file on export.
