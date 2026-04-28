@@ -21,24 +21,8 @@ def menu_export_nud(self, context):
     self.layout.operator(export_nud.ExportNud.bl_idname, text=text)
 
 
-classes = [
-    import_nud.ImportNud,
-    import_animation.ImportPac,
-    export_nud.ExportNud,
-    export_image.SM4SH_PT_image_export_panel,
-]
-
-
-def register():
-    for cls in classes:
-        bpy.utils.register_class(cls)
-
-    bpy.types.TOPBAR_MT_file_import.append(menu_import_nud)
-    bpy.types.TOPBAR_MT_file_import.append(menu_import_pac)
-
-    bpy.types.TOPBAR_MT_file_export.append(menu_export_nud)
-
-    bpy.types.Image.sm4sh_image_format = bpy.props.EnumProperty(
+class ImageProperties(bpy.types.PropertyGroup):
+    image_format: bpy.props.EnumProperty(
         name="Image Format",
         items=[
             (
@@ -72,7 +56,8 @@ def register():
         description="The image format to encode for the exported model.nut",
         default="BC3Unorm",
     )
-    bpy.types.Image.sm4sh_image_dimension = bpy.props.EnumProperty(
+
+    image_dimension: bpy.props.EnumProperty(
         name="Texture Dimension",
         items=[
             ("2D", "2D", "2D image"),
@@ -81,11 +66,33 @@ def register():
         description="The texture dimension for the exported model.nut",
         default="2D",
     )
-    bpy.types.Image.sm4sh_generate_mipmaps = bpy.props.BoolProperty(
+
+    generate_mipmaps: bpy.props.BoolProperty(
         name="Generate Mipmaps",
         description="Generate mipmaps for the exported model.nut",
         default=True,
     )
+
+
+classes = [
+    import_nud.ImportNud,
+    import_animation.ImportPac,
+    export_nud.ExportNud,
+    export_image.SM4SH_PT_image_export_panel,
+    ImageProperties,
+]
+
+
+def register():
+    for cls in classes:
+        bpy.utils.register_class(cls)
+
+    bpy.types.TOPBAR_MT_file_import.append(menu_import_nud)
+    bpy.types.TOPBAR_MT_file_import.append(menu_import_pac)
+
+    bpy.types.TOPBAR_MT_file_export.append(menu_export_nud)
+
+    bpy.types.Image.sm4sh_blender = bpy.props.PointerProperty(type=ImageProperties)
 
 
 def unregister():
@@ -97,5 +104,4 @@ def unregister():
 
     bpy.types.TOPBAR_MT_file_export.remove(menu_export_nud)
 
-    del bpy.types.Image.sm4sh_image_format
-    del bpy.types.Image.sm4sh_image_dimension
+    del bpy.types.Image.sm4sh_blender

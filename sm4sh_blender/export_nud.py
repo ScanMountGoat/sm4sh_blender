@@ -178,8 +178,8 @@ def export_nud(
     if export_nut:
         start = time.time()
         # In game nut files sort textures by their integer hash.
-        image_args = sorted(image_args.values(), key=lambda x: x.hash_id)
-        model.textures = sm4sh_model_py.encode_images_rgbaf32(image_args)
+        sorted_image_args = sorted(image_args.values(), key=lambda x: x.hash_id)
+        model.textures = sm4sh_model_py.encode_images_rgbaf32(sorted_image_args)
         end = time.time()
         print(f"Encode Images: {end - start}")
 
@@ -190,6 +190,7 @@ def export_nud(
 
     if export_metal:
         # TODO: modify a copy?
+        # TODO: potentially modify image args here?
         make_metal(model, database)
         metal_nud = model.to_nud()
         metal_nud.save(str(Path(output_nud_path).with_name("metal.nud")))
