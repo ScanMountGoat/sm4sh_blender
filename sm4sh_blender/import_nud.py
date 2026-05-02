@@ -55,6 +55,8 @@ class ImportNud(bpy.types.Operator, ImportHelper):
         end = time.time()
         print(f"Load Model: {end - start}")
 
+        # TODO: load metal.nud model material settings if the file exists
+
         start = time.time()
 
         try:

@@ -1,3 +1,4 @@
+import copy
 import os
 import re
 import time
@@ -71,16 +72,6 @@ def name_sort_index(name: str):
     return [int(c) if c.isdigit() else c for c in re.split("([0-9]+)", name)]
 
 
-class MeshObject:
-    def __init__(
-        self,
-        mesh: sm4sh_model_py.model.NudMeshGroupMesh,
-        blender_mesh: bpy.types.Mesh,
-    ):
-        self.mesh = mesh
-        self.blender_mesh = blender_mesh
-
-
 def export_nud(
     operator: bpy.types.Operator,
     context: bpy.types.Context,
@@ -126,7 +117,8 @@ def export_nud(
 
     image_args = {}
 
-    mesh_objects = []
+    meshes = []
+    metal_meshes = []
     for o in sorted_objects:
         name = extract_name(o.name, ".")
         # TODO: preserve sort bias?
@@ -134,26 +126,36 @@ def export_nud(
         mesh, parent_bone_index = export_mesh(
             context, operator, o, bone_names, database, image_args
         )
-        mesh_objects.append(
-            MeshObject(
+
+        if export_metal:
+            metal_mesh = make_metal_mesh(mesh, o, database, image_args)
+
+            metal_meshes.append(
                 sm4sh_model_py.model.NudMeshGroupMesh(
-                    name, sort_bias, parent_bone_index, mesh
-                ),
-                o.data,
+                    name, sort_bias, parent_bone_index, metal_mesh
+                )
+            )
+
+        meshes.append(
+            sm4sh_model_py.model.NudMeshGroupMesh(
+                name, sort_bias, parent_bone_index, mesh
             )
         )
 
-    # TODO: Calculate better bounding spheres
-    groups = sm4sh_model_py.model.create_mesh_groups(
-        [mesh.mesh for mesh in mesh_objects]
-    )
+    groups = sm4sh_model_py.model.create_mesh_groups(meshes)
+    metal_groups = sm4sh_model_py.model.create_mesh_groups(metal_meshes)
 
     # Preserve the order of the original groups with new groups at the end.
     if original_model is not None:
         name_pos = {g.name: i for i, g in enumerate(original_model.groups)}
         groups.sort(key=lambda g: name_pos.get(g.name, 0xFFFFFFFF))
+        metal_groups.sort(key=lambda g: name_pos.get(g.name, 0xFFFFFFFF))
 
+    # TODO: Calculate better bounding spheres
     model = sm4sh_model_py.NudModel(groups, image_textures, [0, 0, 0, 10.0], None)
+    metal_model = sm4sh_model_py.NudModel(
+        metal_groups, image_textures, [0, 0, 0, 10.0], None
+    )
 
     end = time.time()
     print(f"Create NudModel: {end - start}")
@@ -164,10 +166,7 @@ def export_nud(
     nud.save(output_nud_path)
 
     if export_metal:
-        # TODO: modify a copy?
-        # TODO: potentially modify image args here?
-        make_metal(model, database)
-        metal_nud = model.to_nud()
+        metal_nud = metal_model.to_nud()
         metal_nud.save(str(Path(output_nud_path).with_name("metal.nud")))
 
     if export_nut:
@@ -185,13 +184,23 @@ def export_nud(
     print(f"Export Files: {end - start}")
 
 
-def make_metal(
-    model: sm4sh_model_py.NudModel,
-    database: sm4sh_model_py.database.ShaderDatabase,
+def make_metal_mesh(
+    mesh,
+    o: bpy.types.Object,
+    database,
+    image_args,
 ):
-    for group in model.groups:
-        for mesh in group.meshes:
-            # TODO: should every material be metal?
-            if mesh.material1 is not None:
-                # TODO: access the blender material here by storing it earlier?
-                mesh.material1 = metal_material(mesh.material1, database)
+    # Mesh creation is expensive, so just copy the base mesh.
+    metal_mesh = copy.deepcopy(mesh)
+
+    # TODO: error if no materials?
+    blender_material = None
+    if len(o.data.materials) > 0:
+        blender_material = o.data.materials[0]
+
+    # TODO: should every material be metal?
+    metal_mesh.material1 = metal_material(
+        mesh.material1, blender_material, database, image_args
+    )
+
+    return metal_mesh

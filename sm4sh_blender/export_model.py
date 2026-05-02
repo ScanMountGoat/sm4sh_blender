@@ -4,7 +4,6 @@ from typing import Optional, Tuple
 import bmesh
 import bpy
 import numpy as np
-
 from mathutils import Matrix
 
 from sm4sh_blender.export_material import default_material, export_material
