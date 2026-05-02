@@ -1,6 +1,6 @@
 import bpy
 
-from . import export_image, export_nud, import_animation, import_nud
+from . import export_image, export_material, export_nud, import_animation, import_nud
 
 
 def menu_import_nud(self, context):
@@ -71,12 +71,30 @@ class ImageProperties(bpy.types.PropertyGroup):
     )
 
 
+class MaterialProperties(bpy.types.PropertyGroup):
+    metal_diffuse: bpy.props.PointerProperty(
+        name="Metal Diffuse Image",
+        description="The diffuse texture image for the exported metal.nud. This should use RGB (33, 33, 33) to match in game models and include the alpha channel for transparency if needed",
+        type=bpy.types.Image,
+    )
+
+    metal_reflection_color: bpy.props.FloatVectorProperty(
+        name="Metal Reflection Color",
+        description="The color value for NU_reflectionColor for the exported metal.nud",
+        subtype="COLOR",  # TODO: should this be COLOR or COLOR_GAMMA?
+        size=4,
+        default=(3.0, 3.0, 3.0, 1.0),
+    )
+
+
 classes = [
     import_nud.ImportNud,
     import_animation.ImportPac,
     export_nud.ExportNud,
     export_image.SM4SH_PT_image_export_panel,
+    export_material.SM4SH_PT_material_export_panel,
     ImageProperties,
+    MaterialProperties,
 ]
 
 
@@ -90,6 +108,9 @@ def register():
     bpy.types.TOPBAR_MT_file_export.append(menu_export_nud)
 
     bpy.types.Image.sm4sh_blender = bpy.props.PointerProperty(type=ImageProperties)
+    bpy.types.Material.sm4sh_blender = bpy.props.PointerProperty(
+        type=MaterialProperties
+    )
 
 
 def unregister():
@@ -102,3 +123,4 @@ def unregister():
     bpy.types.TOPBAR_MT_file_export.remove(menu_export_nud)
 
     del bpy.types.Image.sm4sh_blender
+    del bpy.types.Material.sm4sh_blender

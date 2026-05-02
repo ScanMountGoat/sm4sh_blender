@@ -1,4 +1,3 @@
-import itertools
 import os
 import re
 import time
@@ -72,6 +71,16 @@ def name_sort_index(name: str):
     return [int(c) if c.isdigit() else c for c in re.split("([0-9]+)", name)]
 
 
+class MeshObject:
+    def __init__(
+        self,
+        mesh: sm4sh_model_py.model.NudMeshGroupMesh,
+        blender_mesh: bpy.types.Mesh,
+    ):
+        self.mesh = mesh
+        self.blender_mesh = blender_mesh
+
+
 def export_nud(
     operator: bpy.types.Operator,
     context: bpy.types.Context,
@@ -117,69 +126,37 @@ def export_nud(
 
     image_args = {}
 
-    # TODO: Calculate better bounding sphere.
-    groups = []
-    model = sm4sh_model_py.NudModel(groups, image_textures, [0, 0, 0, 10.0], None)
-
-    extract_object_name = lambda o: extract_name(o.name, ".")
-
-    for name, objects in itertools.groupby(sorted_objects, key=extract_object_name):
-        meshes_parent_indices = []
-        for o in objects:
-            mesh_parent_index = export_mesh(
-                context, operator, o, bone_names, database, image_args
-            )
-            meshes_parent_indices.append(mesh_parent_index)
-
-        # TODO: Calculate better bounding sphere.
+    mesh_objects = []
+    for o in sorted_objects:
+        name = extract_name(o.name, ".")
         # TODO: preserve sort bias?
-
-        # Groups with the same name must have the same bone flags.
-        # This means the parent bone can't be used if any meshes need skinning.
-        if all(index is not None for _, index in meshes_parent_indices):
-            # Split since each group can only have one parent bone.
-            for parent_bone_index, split_meshes_parents in itertools.groupby(
-                meshes_parent_indices, key=lambda o: o[1]
-            ):
-                meshes = [mesh for mesh, _ in split_meshes_parents]
-                # Use the parent bone instead of skin weights.
-                for mesh in meshes:
-                    mesh.vertices.bones = None
-
-                group = sm4sh_model_py.NudMeshGroup(
-                    name,
-                    meshes,
-                    0.0,
-                    [0, 0, 0, 10.0],
-                    parent_bone_index,
-                )
-                groups.append(group)
-        else:
-            meshes = [mesh for mesh, _ in meshes_parent_indices]
-            group = sm4sh_model_py.NudMeshGroup(
-                name,
-                meshes,
-                0.0,
-                [0, 0, 0, 10.0],
-                None,
+        sort_bias = 0.0
+        mesh, parent_bone_index = export_mesh(
+            context, operator, o, bone_names, database, image_args
+        )
+        mesh_objects.append(
+            MeshObject(
+                sm4sh_model_py.model.NudMeshGroupMesh(
+                    name, sort_bias, parent_bone_index, mesh
+                ),
+                o.data,
             )
-            groups.append(group)
+        )
+
+    # TODO: Calculate better bounding spheres
+    groups = sm4sh_model_py.model.create_mesh_groups(
+        [mesh.mesh for mesh in mesh_objects]
+    )
 
     # Preserve the order of the original groups with new groups at the end.
     if original_model is not None:
         name_pos = {g.name: i for i, g in enumerate(original_model.groups)}
         groups.sort(key=lambda g: name_pos.get(g.name, 0xFFFFFFFF))
 
+    model = sm4sh_model_py.NudModel(groups, image_textures, [0, 0, 0, 10.0], None)
+
     end = time.time()
     print(f"Create NudModel: {end - start}")
-
-    if export_nut:
-        start = time.time()
-        # In game nut files sort textures by their integer hash.
-        sorted_image_args = sorted(image_args.values(), key=lambda x: x.hash_id)
-        model.textures = sm4sh_model_py.encode_images_rgbaf32(sorted_image_args)
-        end = time.time()
-        print(f"Encode Images: {end - start}")
 
     start = time.time()
 
@@ -194,6 +171,13 @@ def export_nud(
         metal_nud.save(str(Path(output_nud_path).with_name("metal.nud")))
 
     if export_nut:
+        start = time.time()
+        # In game nut files sort textures by their integer hash.
+        sorted_image_args = sorted(image_args.values(), key=lambda x: x.hash_id)
+        model.textures = sm4sh_model_py.encode_images_rgbaf32(sorted_image_args)
+        end = time.time()
+        print(f"Encode Images: {end - start}")
+
         nut = model.to_nut()
         nut.save(output_nud_path.replace(".nud", ".nut"))
 
@@ -209,4 +193,5 @@ def make_metal(
         for mesh in group.meshes:
             # TODO: should every material be metal?
             if mesh.material1 is not None:
+                # TODO: access the blender material here by storing it earlier?
                 mesh.material1 = metal_material(mesh.material1, database)

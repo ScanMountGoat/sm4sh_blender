@@ -4,6 +4,7 @@ from typing import Optional, Tuple
 import bmesh
 import bpy
 import numpy as np
+
 from mathutils import Matrix
 
 from sm4sh_blender.export_material import default_material, export_material
@@ -273,7 +274,7 @@ def export_mesh_inner(
             message = f"Vertex group {influence.bone_name} for mesh {mesh_name} is not in the vbn bone list."
             raise ExportException(message)
 
-    if len(influences) > 0:
+    if len(influences) > 1:
         # Blender normalizes while animating, so weights may not be normalized.
         # sm4sh_model_py needs the element type to properly normalize weights.
         bone_element_type = sm4sh_model_py.vertex.BoneElementType.Byte
@@ -286,8 +287,8 @@ def export_mesh_inner(
             skin_weights.bone_weights,
             bone_element_type,
         )
-
-    if len(influences) == 1:
+    elif len(influences) == 1:
+        # Avoid storing weights if there is only one influence.
         # Store information for a potential parent bone optimization for later.
         parent_name = influences[0].bone_name
         for i, name in enumerate(bone_names):

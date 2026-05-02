@@ -10,18 +10,37 @@ from sm4sh_blender.utils import (
 
 from . import sm4sh_model_py
 
-global_texture_hashes = {
-    0x10000001,
-    0x10000007,
-    0x10040000,
-    0x10040001,
-    0x10080000,
-    0x10100000,
-    0x10101000,
-    0x10102000,
-    0x10104100,
-    0x10104FFF,
-}
+
+class SM4SH_PT_material_export_panel(bpy.types.Panel):
+    bl_label = "sm4sh_blender"
+    bl_idname = "SM4SH_PT_material_export_panel"
+    bl_space_type = "PROPERTIES"
+    bl_region_type = "WINDOW"
+    bl_context = "material"
+    bl_category = "sm4sh_blender"
+
+    @classmethod
+    def poll(cls, context):
+        if not context.object:
+            return False
+        if context.object.type != "MESH":
+            return False
+        if context.object.active_material is None:
+            return False
+
+        return True
+
+    def draw(self, context):
+        material = context.object.active_material
+
+        layout = self.layout
+        layout.use_property_split = True
+        layout.prop(material.sm4sh_blender, "metal_diffuse", text="Metal Diffuse Image")
+        layout.prop(
+            material.sm4sh_blender,
+            "metal_reflection_color",
+            text="Metal Reflection Color",
+        )
 
 
 def export_material(
@@ -30,6 +49,19 @@ def export_material(
 ) -> sm4sh_model_py.NudMaterial:
     # TODO: validate material textures and properties against the shader.
     # TODO: warn or error for extra properties and missing properties?
+
+    global_texture_hashes = {
+        0x10000001,
+        0x10000007,
+        0x10040000,
+        0x10040001,
+        0x10080000,
+        0x10100000,
+        0x10101000,
+        0x10102000,
+        0x10104100,
+        0x10104FFF,
+    }
 
     # TODO: Better error handling
     flags = 0x94010161

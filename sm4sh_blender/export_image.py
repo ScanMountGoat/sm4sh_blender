@@ -2,8 +2,6 @@ import bpy
 
 
 class SM4SH_PT_image_export_panel(bpy.types.Panel):
-    """UI panel for export function."""
-
     bl_label = "sm4sh_blender"
     bl_idname = "SM4SH_PT_image_export_panel"
     bl_space_type = "IMAGE_EDITOR"
@@ -11,8 +9,6 @@ class SM4SH_PT_image_export_panel(bpy.types.Panel):
     bl_category = "sm4sh_blender"
 
     def draw(self, context):
-        """Draw UI panel."""
-
         image = context.space_data.image
         if image is not None:
             layout = self.layout
