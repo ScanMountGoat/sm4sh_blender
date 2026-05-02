@@ -1,11 +1,14 @@
-from typing import Optional, Tuple
-import bpy
 import math
-from mathutils import Matrix
-from sm4sh_blender.export_material import default_material, export_material
-from . import sm4sh_model_py
-import numpy as np
+from typing import Optional, Tuple
+
 import bmesh
+import bpy
+import numpy as np
+from mathutils import Matrix
+
+from sm4sh_blender.export_material import default_material, export_material
+
+from . import sm4sh_model_py
 
 
 class ExportException(Exception):

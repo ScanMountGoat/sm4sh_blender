@@ -1,21 +1,19 @@
+import itertools
+import os
+import re
+import time
 from pathlib import Path
 
 import bpy
-import time
-import re
-import os
-import itertools
+from bpy.props import BoolProperty, StringProperty
+from bpy_extras.io_utils import ExportHelper
 
 from sm4sh_blender.export_material import metal_material
 from sm4sh_blender.import_model import init_logging
 from sm4sh_blender.utils import extract_name
 
-from .export_model import ExportException, export_mesh
-
 from . import sm4sh_model_py
-
-from bpy_extras.io_utils import ExportHelper
-from bpy.props import StringProperty, BoolProperty
+from .export_model import ExportException, export_mesh
 
 
 class ExportNud(bpy.types.Operator, ExportHelper):

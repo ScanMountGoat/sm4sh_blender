@@ -1,7 +1,8 @@
-from typing import Dict, Optional, Set, Tuple
-import bpy
-import typing
 import struct
+import typing
+from typing import Dict, Optional, Set, Tuple
+
+import bpy
 
 from sm4sh_blender.node_group import (
     create_node_group,

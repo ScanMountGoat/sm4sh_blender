@@ -1,4 +1,5 @@
 from typing import Tuple
+
 import bpy
 
 from sm4sh_blender.node_layout import layout_nodes

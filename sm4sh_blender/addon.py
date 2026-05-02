@@ -1,9 +1,6 @@
 import bpy
 
-from . import import_nud
-from . import import_animation
-from . import export_nud
-from . import export_image
+from . import export_image, export_nud, import_animation, import_nud
 
 
 def menu_import_nud(self, context):

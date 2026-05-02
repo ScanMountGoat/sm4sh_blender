@@ -1,13 +1,15 @@
 import logging
-from typing import Optional
-import bpy
-import numpy as np
 import math
 import struct
+from typing import Optional
+
+import bpy
+import numpy as np
+from mathutils import Matrix
 
 from sm4sh_blender.import_material import import_material
+
 from . import sm4sh_model_py
-from mathutils import Matrix
 
 
 class ImportException(Exception):

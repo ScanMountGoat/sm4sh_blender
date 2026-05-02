@@ -1,12 +1,14 @@
 import bpy
+import numpy as np
+
 from sm4sh_blender.utils import (
     extract_name,
     float32_from_bits,
     get_enum_value,
     parse_int,
 )
+
 from . import sm4sh_model_py
-import numpy as np
 
 global_texture_hashes = {
     0x10000001,

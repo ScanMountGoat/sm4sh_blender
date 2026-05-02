@@ -1,13 +1,13 @@
-import bpy
 import time
+
+import bpy
 import numpy as np
+from bpy.props import StringProperty
+from bpy_extras.io_utils import ImportHelper
 
 from sm4sh_blender.import_model import init_logging
 
 from . import sm4sh_model_py
-
-from bpy_extras.io_utils import ImportHelper
-from bpy.props import StringProperty
 
 
 class ImportPac(bpy.types.Operator, ImportHelper):
