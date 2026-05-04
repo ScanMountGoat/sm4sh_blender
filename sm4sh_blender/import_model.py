@@ -1,6 +1,5 @@
 import logging
 import math
-import struct
 from typing import Optional
 
 import bpy
@@ -26,6 +25,7 @@ def import_nud_model(
     operator,
     context,
     model: sm4sh_model_py.NudModel,
+    metal_model: Optional[sm4sh_model_py.NudModel],
     database: sm4sh_model_py.database.ShaderDatabase,
     use_advanced_nodes: bool,
 ) -> Optional[bpy.types.Object]:
@@ -46,14 +46,27 @@ def import_nud_model(
         armature = import_armature(operator, context, model.skeleton, "Armature")
         bone_names = [b.name for b in model.skeleton.bones]
 
-    for group in model.groups:
-        for i, mesh in enumerate(group.meshes):
+    for group_index in range(len(model.groups)):
+        group = model.groups[group_index]
+
+        metal_group = None
+        if metal_model is not None and group_index < len(metal_model.groups):
+            metal_group = metal_model.groups[group_index]
+
+        for mesh_index in range(len(group.meshes)):
+            mesh = group.meshes[mesh_index]
+
+            metal_mesh = None
+            if metal_group is not None and mesh_index < len(metal_group.meshes):
+                metal_mesh = metal_group.meshes[mesh_index]
+
             import_mesh(
                 operator,
                 context.collection,
                 group,
                 mesh,
-                i,
+                metal_mesh,
+                mesh_index,
                 armature,
                 bone_names,
                 database,
@@ -68,14 +81,15 @@ def import_mesh(
     collection: bpy.types.Collection,
     group: sm4sh_model_py.NudMeshGroup,
     mesh: sm4sh_model_py.NudMesh,
-    i: int,
+    metal_mesh: Optional[sm4sh_model_py.NudMesh],
+    mesh_index: int,
     armature: Optional[bpy.types.Object],
     bone_names: list[str],
     database: sm4sh_model_py.database.ShaderDatabase,
     use_advanced_nodes: bool,
 ):
     # Match Blender's naming conventions to preserve order for export.
-    name = f"{group.name}.{i:03}" if i > 0 else group.name
+    name = f"{group.name}.{mesh_index:03}" if mesh_index > 0 else group.name
     blender_mesh = bpy.data.meshes.new(name)
 
     indices = mesh.triangle_list_indices().astype(np.uint32)
@@ -100,8 +114,8 @@ def import_mesh(
         import_colors(blender_mesh, colors.colors, "Color")
 
     uv_layers = mesh.vertices.uvs.uvs()
-    for i, uvs in enumerate(uv_layers):
-        import_uvs(operator, blender_mesh, indices, uvs, f"UV{i}")
+    for mesh_index, uvs in enumerate(uv_layers):
+        import_uvs(operator, blender_mesh, indices, uvs, f"UV{mesh_index}")
 
     blender_mesh.update()
 
@@ -119,20 +133,36 @@ def import_mesh(
     blender_mesh.transform(y_up_to_z_up)
 
     if material := mesh.material1:
+        metal_material = None
+        if metal_mesh is not None:
+            metal_material = metal_mesh.material1
+
         blender_mesh.materials.append(
-            import_material(material, database, use_advanced_nodes)
+            import_material(material, metal_material, database, use_advanced_nodes)
         )
     if material := mesh.material2:
+        metal_material = None
+        if metal_mesh is not None:
+            metal_material = metal_mesh.material2
+
         blender_mesh.materials.append(
-            import_material(material, database, use_advanced_nodes)
+            import_material(material, metal_material, database, use_advanced_nodes)
         )
     if material := mesh.material3:
+        metal_material = None
+        if metal_mesh is not None:
+            metal_material = metal_mesh.material3
+
         blender_mesh.materials.append(
-            import_material(material, database, use_advanced_nodes)
+            import_material(material, metal_material, database, use_advanced_nodes)
         )
     if material := mesh.material4:
+        metal_material = None
+        if metal_mesh is not None:
+            metal_material = metal_mesh.material4
+
         blender_mesh.materials.append(
-            import_material(material, database, use_advanced_nodes)
+            import_material(material, metal_material, database, use_advanced_nodes)
         )
 
     obj = bpy.data.objects.new(blender_mesh.name, blender_mesh)

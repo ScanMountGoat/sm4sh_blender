@@ -27,11 +27,16 @@ else:
 
 def import_material(
     material: sm4sh_model_py.NudMaterial,
+    metal_material: Optional[sm4sh_model_py.NudMaterial],
     database: sm4sh_model_py.database.ShaderDatabase,
     use_advanced_nodes: bool,
 ) -> bpy.types.Material:
     name = f"{material.shader_id:08X}"
     shader = database.get_shader(material.shader_id)
+
+    metal_shader = None
+    if metal_material is not None:
+        metal_shader = database.get_shader(metal_material.shader_id)
 
     if use_advanced_nodes:
         # Blender doesn't support material instances that differ only by property and texture values.
@@ -50,6 +55,12 @@ def import_material(
     else:
         # Use basic nodes since recreating the shaders is slow and doesn't always render properly.
         blender_material = create_material_basic(material, shader)
+
+    # Preserve material settings for export later.
+    update_custom_properties(blender_material, material)
+
+    # Preserve the metal.nud material settings for export later.
+    update_metal_custom_properties(blender_material, metal_material, metal_shader)
 
     return blender_material
 
@@ -244,17 +255,6 @@ def update_material(
     material: sm4sh_model_py.NudMaterial,
     shader: sm4sh_model_py.database.ShaderProgram,
 ):
-    # Use custom properties to preserve values that are hard to represent in Blender.
-    blender_material["src_factor"] = str(material.src_factor).removeprefix("SrcFactor.")
-    blender_material["dst_factor"] = str(material.dst_factor).removeprefix("DstFactor.")
-    blender_material["alpha_func"] = str(material.alpha_func).removeprefix("AlphaFunc.")
-    blender_material["cull_mode"] = str(material.cull_mode).removeprefix("CullMode.")
-
-    for prop in material.properties:
-        if prop.name == "NU_materialHash":
-            material_hash = float32_bits(prop.values[0])
-            blender_material["NU_materialHash"] = f"{material_hash:08X}"
-
     nodes = blender_material.node_tree.nodes
 
     for prop in material.properties:
@@ -287,6 +287,36 @@ def update_material(
                     node.extension = "MIRROR"
                 case sm4sh_model_py.WrapMode.ClampToEdge:
                     node.extension = "CLIP"
+
+
+def update_custom_properties(blender_material, material):
+    # Use custom properties to preserve values that are hard to represent in Blender.
+    # TODO: register actual properties under blender_material.sm4sh_blender?
+    blender_material["src_factor"] = str(material.src_factor).removeprefix("SrcFactor.")
+    blender_material["dst_factor"] = str(material.dst_factor).removeprefix("DstFactor.")
+    blender_material["alpha_func"] = str(material.alpha_func).removeprefix("AlphaFunc.")
+    blender_material["cull_mode"] = str(material.cull_mode).removeprefix("CullMode.")
+
+    for prop in material.properties:
+        if prop.name == "NU_materialHash":
+            material_hash = float32_bits(prop.values[0])
+            blender_material["NU_materialHash"] = f"{material_hash:08X}"
+
+
+def update_metal_custom_properties(blender_material, metal_material, metal_shader):
+    if metal_material is not None:
+        # Texture usage is determined by the compiled shaders.
+        if metal_shader is not None:
+            for texture, sampler in zip(metal_material.textures, metal_shader.samplers):
+                if sampler == "colorSampler":
+                    # Preserve the metal color texture in case it has an alpha channel.
+                    image_name = f"{texture.hash:08X}"
+                    image = bpy.data.images.get(image_name)
+                    blender_material.sm4sh_blender.metal_diffuse = image
+
+        for prop in metal_material.properties:
+            if prop.name == "NU_reflectionColor":
+                blender_material.sm4sh_blender.reflection_color = prop.values[:4]
 
 
 def material_images_samplers(material, blender_images, samplers):

@@ -1,5 +1,6 @@
 import os
 import time
+from pathlib import Path
 
 import bpy
 from bpy.props import BoolProperty, CollectionProperty, StringProperty
@@ -49,6 +50,11 @@ class ImportNud(bpy.types.Operator, ImportHelper):
 
         model = sm4sh_model_py.load_model(path)
 
+        metal_model = None
+        metal_path = str(Path(path).with_name("metal.nud"))
+        if os.path.exists(metal_path):
+            metal_model = sm4sh_model_py.load_model(metal_path)
+
         database_path = os.path.join(os.path.dirname(__file__), "shaders.bin")
         database = sm4sh_model_py.database.ShaderDatabase.from_file(database_path)
 
@@ -61,7 +67,12 @@ class ImportNud(bpy.types.Operator, ImportHelper):
 
         try:
             armature = import_nud_model(
-                self, context, model, database, self.experimental_shader_nodes
+                self,
+                context,
+                model,
+                metal_model,
+                database,
+                self.experimental_shader_nodes,
             )
             if armature is not None:
                 # Store the path to make exporting easier later.
