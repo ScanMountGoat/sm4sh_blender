@@ -71,29 +71,78 @@ class ImageProperties(bpy.types.PropertyGroup):
     )
 
 
-class MaterialProperties(bpy.types.PropertyGroup):
-    metal_diffuse: bpy.props.PointerProperty(
-        name="Metal Diffuse Image",
+class MetalMaterialProperties(bpy.types.PropertyGroup):
+    diffuse: bpy.props.PointerProperty(
+        name="Diffuse Image",
         description="The diffuse texture image for the exported metal.nud. This should use RGB (33, 33, 33) to match in game models and include the alpha channel for transparency if needed",
         type=bpy.types.Image,
     )
 
-    metal_reflection_color: bpy.props.FloatVectorProperty(
-        name="Metal Reflection Color",
-        description="The color value for NU_reflectionColor for the exported metal.nud",
+    stage_cube: bpy.props.EnumProperty(
+        name="Stage Reflection Cube",
+        items=[
+            (
+                "10101000",
+                "Rough (10101000)",
+                "The low resolution stage cube map for rough reflections",
+            ),
+            (
+                "10102000",
+                "Glossy (10102000)",
+                "The high resolution stage cube map for glossy reflections",
+            ),
+        ],
+        description="The reflection cube map texture hash for the exported metal.nud",
+        default="10102000",
+    )
+
+    reflection_color: bpy.props.FloatVectorProperty(
+        name="NU_reflectionColor",
+        description="The value for NU_reflectionColor for the exported metal.nud",
         subtype="COLOR",  # TODO: should this be COLOR or COLOR_GAMMA?
         size=4,
         default=(3.0, 3.0, 3.0, 1.0),
     )
 
+    fresnel_color: bpy.props.FloatVectorProperty(
+        name="NU_fresnelColor",
+        description="The value for NU_fresnelColor for the exported metal.nud",
+        subtype="COLOR",  # TODO: should this be COLOR or COLOR_GAMMA?
+        size=4,
+        default=(0.6, 0.6, 0.6, 1.0),
+    )
 
+    fresnel_params: bpy.props.FloatVectorProperty(
+        name="NU_fresnelParams",
+        description="The value for NU_fresnelParams for the exported metal.nud",
+        subtype="XYZ",
+        size=4,
+        default=(3.7, 0.0, 0.0, 1.0),
+    )
+
+    ao_min_gain: bpy.props.FloatVectorProperty(
+        name="NU_aoMinGain",
+        description="The value for NU_fresnelColor for the exported metal.nud",
+        subtype="COLOR",  # TODO: should this be COLOR or COLOR_GAMMA?
+        size=4,
+        default=(0.6, 0.6, 0.6, 1.0),
+    )
+
+
+class MaterialProperties(bpy.types.PropertyGroup):
+    metal: bpy.props.PointerProperty(type=MetalMaterialProperties)
+
+
+# The order here matters.
 classes = [
     import_nud.ImportNud,
     import_animation.ImportPac,
     export_nud.ExportNud,
     export_image.SM4SH_PT_image_export_panel,
     export_material.SM4SH_PT_material_export_panel,
+    export_material.SM4SH_PT_metal_material_export_panel,
     ImageProperties,
+    MetalMaterialProperties,
     MaterialProperties,
 ]
 

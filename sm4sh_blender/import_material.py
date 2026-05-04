@@ -289,7 +289,9 @@ def update_material(
                     node.extension = "CLIP"
 
 
-def update_custom_properties(blender_material, material):
+def update_custom_properties(
+    blender_material: bpy.types.Material, material: sm4sh_model_py.NudMaterial
+):
     # Use custom properties to preserve values that are hard to represent in Blender.
     # TODO: register actual properties under blender_material.sm4sh_blender?
     blender_material["src_factor"] = str(material.src_factor).removeprefix("SrcFactor.")
@@ -303,7 +305,11 @@ def update_custom_properties(blender_material, material):
             blender_material["NU_materialHash"] = f"{material_hash:08X}"
 
 
-def update_metal_custom_properties(blender_material, metal_material, metal_shader):
+def update_metal_custom_properties(
+    blender_material: bpy.types.Material,
+    metal_material: Optional[sm4sh_model_py.NudMaterial],
+    metal_shader: Optional[sm4sh_model_py.database.ShaderProgram],
+):
     if metal_material is not None:
         # Texture usage is determined by the compiled shaders.
         if metal_shader is not None:
@@ -312,11 +318,30 @@ def update_metal_custom_properties(blender_material, metal_material, metal_shade
                     # Preserve the metal color texture in case it has an alpha channel.
                     image_name = f"{texture.hash:08X}"
                     image = bpy.data.images.get(image_name)
-                    blender_material.sm4sh_blender.metal_diffuse = image
+                    blender_material.sm4sh_blender.metal.diffuse = image
+                elif sampler == "reflectionSampler":
+                    # Preserve glossy vs rough reflections.
+                    if texture.hash == 0x10102000:
+                        blender_material.sm4sh_blender.metal.stage_cube = "10102000"
+                    elif texture.hash == 0x10101000:
+                        blender_material.sm4sh_blender.metal.stage_cube = "10101000"
 
+        # Preserve material parameters for reimporting custom models that modify these values.
+        # Default metal.nud models always use the same property values.
         for prop in metal_material.properties:
-            if prop.name == "NU_reflectionColor":
-                blender_material.sm4sh_blender.reflection_color = prop.values[:4]
+            match prop.name:
+                case "NU_reflectionColor":
+                    blender_material.sm4sh_blender.metal.reflection_color = prop.values[
+                        :4
+                    ]
+                case "NU_fresnelColor":
+                    blender_material.sm4sh_blender.metal.fresnel_color = prop.values[:4]
+                case "NU_fresnelParams":
+                    blender_material.sm4sh_blender.metal.fresnel_params = prop.values[
+                        :4
+                    ]
+                case "NU_aoMinGain":
+                    blender_material.sm4sh_blender.metal.ao_min_gain = prop.values[:4]
 
 
 def material_images_samplers(material, blender_images, samplers):

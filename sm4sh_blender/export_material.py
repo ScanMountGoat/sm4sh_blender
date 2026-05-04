@@ -37,12 +37,41 @@ class SM4SH_PT_material_export_panel(bpy.types.Panel):
 
         layout = self.layout
         layout.use_property_split = True
-        layout.prop(material.sm4sh_blender, "metal_diffuse", text="Metal Diffuse Image")
-        layout.prop(
-            material.sm4sh_blender,
-            "metal_reflection_color",
-            text="Metal Reflection Color",
-        )
+        # TODO: custom properties
+
+
+class SM4SH_PT_metal_material_export_panel(bpy.types.Panel):
+    bl_label = "metal.nud"
+    bl_idname = "SM4SH_PT_metal_material_export_panel"
+    bl_space_type = "PROPERTIES"
+    bl_region_type = "WINDOW"
+    bl_context = "material"
+    bl_category = "sm4sh_blender"
+    bl_parent_id = "SM4SH_PT_material_export_panel"
+
+    @classmethod
+    def poll(cls, context):
+        if not context.object:
+            return False
+        if context.object.type != "MESH":
+            return False
+        if context.object.active_material is None:
+            return False
+
+        return True
+
+    def draw(self, context):
+        material = context.object.active_material
+
+        # TODO: collapsible section for metal.nud?
+        layout = self.layout
+        layout.use_property_split = True
+        layout.prop(material.sm4sh_blender.metal, "diffuse")
+        layout.prop(material.sm4sh_blender.metal, "stage_cube")
+        layout.prop(material.sm4sh_blender.metal, "reflection_color")
+        layout.prop(material.sm4sh_blender.metal, "fresnel_color")
+        layout.prop(material.sm4sh_blender.metal, "fresnel_params")
+        layout.prop(material.sm4sh_blender.metal, "ao_min_gain")
 
 
 global_texture_hashes = {
@@ -256,13 +285,24 @@ def metal_material(
         if p.name == "NU_materialHash":
             hash = p.values[0]
 
-    reflection_color = [3, 3, 3, 1]
-    if blender_material is not None:
-        reflection_color = blender_material.sm4sh_blender.metal_reflection_color
-
     diffuse_hash = 0x10104FFF
+    reflection_color = [3, 3, 3, 1]
+    ao_min_gain = [0.3, 0.3, 0.3, 1]
+    fresnel_color = [0.6, 0.6, 0.6, 1.0]
+    fresnel_params = [3.7, 0, 0, 0]
+    reflection_hash = 0x10102000
+
+    # TODO: blender material should never be none here?
     if blender_material is not None:
-        image = blender_material.sm4sh_blender.metal_diffuse
+        reflection_color = blender_material.sm4sh_blender.metal.reflection_color
+        ao_min_gain = blender_material.sm4sh_blender.metal.ao_min_gain
+        fresnel_color = blender_material.sm4sh_blender.metal.fresnel_color
+        fresnel_params = blender_material.sm4sh_blender.metal.fresnel_params
+
+        if hash := parse_int(blender_material.sm4sh_blender.metal.stage_cube, 16):
+            reflection_hash = hash
+
+        image = blender_material.sm4sh_blender.metal.diffuse
         if image is not None:
             if hash := parse_int(image.name, 16):
                 diffuse_hash = hash
@@ -271,12 +311,12 @@ def metal_material(
 
     properties = [
         sm4sh_model_py.NudProperty("NU_colorSamplerUV", [1, 1, 0, 0]),
-        sm4sh_model_py.NudProperty("NU_fresnelColor", [1, 1, 1, 1]),
+        sm4sh_model_py.NudProperty("NU_fresnelColor", fresnel_color),
         sm4sh_model_py.NudProperty("NU_blinkColor", [0, 0, 0, 0]),
         sm4sh_model_py.NudProperty("NU_reflectionColor", reflection_color),
-        sm4sh_model_py.NudProperty("NU_aoMinGain", [0.3, 0.3, 0.3, 1]),
+        sm4sh_model_py.NudProperty("NU_aoMinGain", ao_min_gain),
         sm4sh_model_py.NudProperty("NU_lightMapColorOffset", [0, 0, 0, 0]),
-        sm4sh_model_py.NudProperty("NU_fresnelParams", [3.7, 0, 0, 0]),
+        sm4sh_model_py.NudProperty("NU_fresnelParams", fresnel_params),
         sm4sh_model_py.NudProperty("NU_alphaBlendParams", [0, 0, 0, 0]),
         sm4sh_model_py.NudProperty("NU_materialHash", [hash, 0, 0, 0]),
     ]
@@ -302,7 +342,7 @@ def metal_material(
             material.cull_mode,
             [
                 default_texture(diffuse_hash),
-                default_texture(0x10102000),
+                default_texture(reflection_hash),
                 normal_texture,
                 default_texture(0x10080000),
             ],
@@ -318,7 +358,7 @@ def metal_material(
             material.cull_mode,
             [
                 default_texture(diffuse_hash),
-                default_texture(0x10102000),
+                default_texture(reflection_hash),
                 default_texture(0x10080000),
             ],
             properties,

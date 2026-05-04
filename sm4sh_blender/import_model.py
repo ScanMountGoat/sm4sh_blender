@@ -288,7 +288,7 @@ def import_weight_groups(
                 group.add([weight.vertex_index], weight.weight, "REPLACE")
 
 
-def import_image(image: sm4sh_model_py.ImageTexture, png: bytes):
+def import_image(image: sm4sh_model_py.ImageTexture, png: bytes) -> bpy.types.Image:
     name = f"{image.hash_id:08X}"
 
     # Depth and array layers are stacked vertically when converting to 2D.
