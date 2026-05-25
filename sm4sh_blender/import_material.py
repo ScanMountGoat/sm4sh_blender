@@ -1,6 +1,6 @@
 import struct
 import typing
-from typing import Dict, Optional, Set, Tuple
+from typing import Dict, Optional, Tuple
 
 import bpy
 
@@ -299,6 +299,7 @@ def update_custom_properties(
     blender_material["alpha_func"] = str(material.alpha_func).removeprefix("AlphaFunc.")
     blender_material["cull_mode"] = str(material.cull_mode).removeprefix("CullMode.")
 
+    # TODO: store this as a string property if blender doesn't support hex?
     for prop in material.properties:
         if prop.name == "NU_materialHash":
             material_hash = float32_bits(prop.values[0])
@@ -375,31 +376,33 @@ def assign_output(
     textures: Dict[str, Optional[bpy.types.Image]],
 ) -> Optional[Tuple[bpy.types.Node, str]]:
     if func := expr.func():
-        mix_rgba_node = lambda ty: assign_mix_rgba(
-            func,
-            expr_outputs,
-            nodes,
-            links,
-            ty,
-        )
 
-        math_node = lambda ty: assign_math(
-            func,
-            expr_outputs,
-            nodes,
-            links,
-            ty,
-        )
+        def mix_rgba_node(ty):
+            return assign_mix_rgba(
+                func,
+                expr_outputs,
+                nodes,
+                links,
+                ty,
+            )
 
-        group_node = lambda func, name, create_node_tree: create_cached_func_group_node(
-            nodes, func, name, create_node_tree
-        )
+        def math_node(ty):
+            return assign_math(
+                func,
+                expr_outputs,
+                nodes,
+                links,
+                ty,
+            )
 
-        assign_args = lambda func, node, params: assign_func_args(
-            func, params, expr_outputs, links, node
-        )
+        def group_node(func, name, create_node_tree):
+            return create_cached_func_group_node(nodes, func, name, create_node_tree)
 
-        assign_arg = lambda i, output: assign_index(i, expr_outputs, links, output)
+        def assign_args(func, node, params):
+            return assign_func_args(func, params, expr_outputs, links, node)
+
+        def assign_arg(i, output):
+            return assign_index(i, expr_outputs, links, output)
 
         match func.op:
             case sm4sh_model_py.database.Operation.Add:
