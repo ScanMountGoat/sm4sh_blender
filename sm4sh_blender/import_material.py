@@ -838,9 +838,27 @@ def assign_uvs(texcoords: list[int], expr_outputs, node, nodes, links):
                 uv_node.inputs["Y"],
             )
         elif len(texcoords) == 3:
-            # TODO: Assign the texcoords instead of assuming the reflection vector.
             uv_node = create_node_group(nodes, "CubeCoords", cube_coords_node_group)
             uv_node.name = uv_name
+
+            assign_index(
+                texcoords[0],
+                expr_outputs,
+                links,
+                uv_node.inputs["X"],
+            )
+            assign_index(
+                texcoords[1],
+                expr_outputs,
+                links,
+                uv_node.inputs["Y"],
+            )
+            assign_index(
+                texcoords[2],
+                expr_outputs,
+                links,
+                uv_node.inputs["Z"],
+            )
         else:
             # TODO: warn if texcoords do not have 2 or 3 coords?
             uv_node = nodes.new("ShaderNodeCombineXYZ")

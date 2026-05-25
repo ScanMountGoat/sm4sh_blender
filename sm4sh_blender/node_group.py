@@ -434,36 +434,35 @@ def cube_coords_node_group(name: str):
     nodes = node_tree.nodes
     links = node_tree.links
 
-    # TODO: take 3 coords as input instead of assuming reflection?
-    # input_node = nodes.new("NodeGroupInput")
-    # node_tree.interface.new_socket(
-    #     in_out="INPUT", socket_type="NodeSocketFloat", name="X"
-    # )
-    # node_tree.interface.new_socket(
-    #     in_out="INPUT", socket_type="NodeSocketFloat", name="Y"
-    # )
-    # node_tree.interface.new_socket(
-    #     in_out="INPUT", socket_type="NodeSocketFloat", name="Z"
-    # )
+    input_node = nodes.new("NodeGroupInput")
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="X"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="Y"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="Z"
+    )
 
     # XYZ cube coordinates to UV: https://en.wikipedia.org/wiki/Cube_mapping
-    coords = nodes.new("ShaderNodeTexCoord")
+    coords = nodes.new("ShaderNodeCombineXYZ")
+    links.new(input_node.outputs["X"], coords.inputs["X"])
+    links.new(input_node.outputs["Y"], coords.inputs["Y"])
+    links.new(input_node.outputs["Z"], coords.inputs["Z"])
 
-    coords_xyz = nodes.new("ShaderNodeSeparateXYZ")
-    links.new(coords.outputs["Reflection"], coords_xyz.inputs["Vector"])
-
-    is_x_positive = is_positive(nodes, links, coords_xyz.outputs["X"])
+    is_x_positive = is_positive(nodes, links, input_node.outputs["X"])
     is_x_negative = invert(nodes, links, is_x_positive)
 
-    is_y_positive = is_positive(nodes, links, coords_xyz.outputs["Y"])
+    is_y_positive = is_positive(nodes, links, input_node.outputs["Y"])
     is_y_negative = invert(nodes, links, is_y_positive)
 
-    is_z_positive = is_positive(nodes, links, coords_xyz.outputs["Z"])
+    is_z_positive = is_positive(nodes, links, input_node.outputs["Z"])
     is_z_negative = invert(nodes, links, is_z_positive)
 
     neg_coords = nodes.new("ShaderNodeVectorMath")
     neg_coords.operation = "MULTIPLY"
-    links.new(coords.outputs["Reflection"], neg_coords.inputs["Vector"])
+    links.new(coords.outputs["Vector"], neg_coords.inputs["Vector"])
     neg_coords.inputs[1].default_value = (-1.0, -1.0, -1.0)
 
     neg_coords_xyz = nodes.new("ShaderNodeSeparateXYZ")
@@ -471,7 +470,7 @@ def cube_coords_node_group(name: str):
 
     abs_coords = nodes.new("ShaderNodeVectorMath")
     abs_coords.operation = "ABSOLUTE"
-    links.new(coords.outputs["Reflection"], abs_coords.inputs["Vector"])
+    links.new(coords.outputs["Vector"], abs_coords.inputs["Vector"])
 
     abs_xyz = nodes.new("ShaderNodeSeparateXYZ")
     links.new(abs_coords.outputs["Vector"], abs_xyz.inputs["Vector"])
@@ -512,29 +511,29 @@ def cube_coords_node_group(name: str):
         links,
         [
             neg_coords_xyz.outputs["Z"],
-            coords_xyz.outputs["Z"],
-            coords_xyz.outputs["X"],
-            coords_xyz.outputs["X"],
-            coords_xyz.outputs["X"],
+            input_node.outputs["Z"],
+            input_node.outputs["X"],
+            input_node.outputs["X"],
+            input_node.outputs["X"],
             neg_coords_xyz.outputs["X"],
         ],
         face_factors,
-        coords_xyz.outputs["Z"],
+        input_node.outputs["Z"],
     )
 
     vc = chained_select(
         nodes,
         links,
         [
-            coords_xyz.outputs["Y"],
-            coords_xyz.outputs["Y"],
+            input_node.outputs["Y"],
+            input_node.outputs["Y"],
             neg_coords_xyz.outputs["Z"],
-            coords_xyz.outputs["Z"],
-            coords_xyz.outputs["Y"],
-            coords_xyz.outputs["Y"],
+            input_node.outputs["Z"],
+            input_node.outputs["Y"],
+            input_node.outputs["Y"],
         ],
         face_factors,
-        coords_xyz.outputs["Y"],
+        input_node.outputs["Y"],
     )
 
     index_offset = chained_select(
