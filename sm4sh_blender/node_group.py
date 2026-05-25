@@ -446,18 +446,27 @@ def cube_coords_node_group(name: str):
     )
 
     # XYZ cube coordinates to UV: https://en.wikipedia.org/wiki/Cube_mapping
+    # The inputs are modified to convert Y-up in game to Blender's Z-up coordinates.
+    neg_y = nodes.new("ShaderNodeMath")
+    neg_y.operation = "MULTIPLY"
+    links.new(input_node.outputs["Y"], neg_y.inputs[0])
+    neg_y.inputs[1].default_value = -1.0
+
     coords = nodes.new("ShaderNodeCombineXYZ")
     links.new(input_node.outputs["X"], coords.inputs["X"])
-    links.new(input_node.outputs["Y"], coords.inputs["Y"])
-    links.new(input_node.outputs["Z"], coords.inputs["Z"])
+    links.new(input_node.outputs["Z"], coords.inputs["Y"])
+    links.new(neg_y.outputs["Value"], coords.inputs["Z"])
 
-    is_x_positive = is_positive(nodes, links, input_node.outputs["X"])
+    coords_xyz = nodes.new("ShaderNodeSeparateXYZ")
+    links.new(coords.outputs["Vector"], coords_xyz.inputs["Vector"])
+
+    is_x_positive = is_positive(nodes, links, coords_xyz.outputs["X"])
     is_x_negative = invert(nodes, links, is_x_positive)
 
-    is_y_positive = is_positive(nodes, links, input_node.outputs["Y"])
+    is_y_positive = is_positive(nodes, links, coords_xyz.outputs["Y"])
     is_y_negative = invert(nodes, links, is_y_positive)
 
-    is_z_positive = is_positive(nodes, links, input_node.outputs["Z"])
+    is_z_positive = is_positive(nodes, links, coords_xyz.outputs["Z"])
     is_z_negative = invert(nodes, links, is_z_positive)
 
     neg_coords = nodes.new("ShaderNodeVectorMath")
@@ -505,35 +514,34 @@ def cube_coords_node_group(name: str):
         is_face_negative_z,
     ]
 
-    # TODO: calculate the conditions for the remaining faces
     uc = chained_select(
         nodes,
         links,
         [
             neg_coords_xyz.outputs["Z"],
-            input_node.outputs["Z"],
-            input_node.outputs["X"],
-            input_node.outputs["X"],
-            input_node.outputs["X"],
+            coords_xyz.outputs["Z"],
+            coords_xyz.outputs["X"],
+            coords_xyz.outputs["X"],
+            coords_xyz.outputs["X"],
             neg_coords_xyz.outputs["X"],
         ],
         face_factors,
-        input_node.outputs["Z"],
+        coords_xyz.outputs["Z"],
     )
 
     vc = chained_select(
         nodes,
         links,
         [
-            input_node.outputs["Y"],
-            input_node.outputs["Y"],
+            coords_xyz.outputs["Y"],
+            coords_xyz.outputs["Y"],
             neg_coords_xyz.outputs["Z"],
-            input_node.outputs["Z"],
-            input_node.outputs["Y"],
-            input_node.outputs["Y"],
+            coords_xyz.outputs["Z"],
+            coords_xyz.outputs["Y"],
+            coords_xyz.outputs["Y"],
         ],
         face_factors,
-        input_node.outputs["Y"],
+        coords_xyz.outputs["Y"],
     )
 
     index_offset = chained_select(
@@ -567,8 +575,10 @@ def cube_coords_node_group(name: str):
     map_range.inputs[1].default_value = (0.5, 0.5, 0.5)
     map_range.inputs[2].default_value = (0.5, 0.5, 0.0)
 
+    # Flip each cube map face vertically to match in game.
+    map_range_flip = flip_y(nodes, links, map_range.outputs["Vector"])
+
     # Modify the UVs based on the face index for a vertical layout.
-    # TODO: is this the correct coordinate to modify?
     apply_index_scale = nodes.new("ShaderNodeCombineXYZ")
     apply_index_scale.inputs["X"].default_value = 1.0
     apply_index_scale.inputs["Y"].default_value = 1.0 / 6.0
@@ -581,17 +591,36 @@ def cube_coords_node_group(name: str):
 
     apply_index = nodes.new("ShaderNodeVectorMath")
     apply_index.operation = "MULTIPLY_ADD"
-    links.new(map_range.outputs["Vector"], apply_index.inputs[0])
+    links.new(map_range_flip.outputs["Vector"], apply_index.inputs[0])
     links.new(apply_index_scale.outputs["Vector"], apply_index.inputs[1])
     links.new(apply_index_offset.outputs["Vector"], apply_index.inputs[2])
 
-    # TODO: Figure out why the cube face images are flipped.
+    # Flip the entire vertically stacked cube map vertically to match in game.
+    apply_index_flip = flip_y(nodes, links, apply_index.outputs["Vector"])
+
     output_node = nodes.new("NodeGroupOutput")
-    links.new(apply_index.outputs["Vector"], output_node.inputs["Vector"])
+    links.new(apply_index_flip.outputs["Vector"], output_node.inputs["Vector"])
 
     layout_nodes(output_node, links)
 
     return node_tree
+
+
+def flip_y(nodes, links, vector_output):
+    xyz = nodes.new("ShaderNodeSeparateXYZ")
+    links.new(vector_output, xyz.inputs["Vector"])
+
+    flip_y = nodes.new("ShaderNodeMath")
+    flip_y.operation = "SUBTRACT"
+    flip_y.inputs[0].default_value = 1.0
+    links.new(xyz.outputs["Y"], flip_y.inputs[1])
+
+    result = nodes.new("ShaderNodeCombineXYZ")
+    links.new(xyz.outputs["X"], result.inputs["X"])
+    links.new(flip_y.outputs["Value"], result.inputs["Y"])
+    links.new(xyz.outputs["Z"], result.inputs["Z"])
+
+    return result
 
 
 def is_positive(nodes, links, output):
