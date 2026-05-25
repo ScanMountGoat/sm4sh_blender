@@ -452,20 +452,14 @@ def cube_coords_node_group(name: str):
     coords_xyz = nodes.new("ShaderNodeSeparateXYZ")
     links.new(coords.outputs["Reflection"], coords_xyz.inputs["Vector"])
 
-    is_x_positive = nodes.new("ShaderNodeMath")
-    is_x_positive.operation = "GREATER_THAN"
-    links.new(coords_xyz.outputs["X"], is_x_positive.inputs[0])
-    is_x_positive.inputs[1].default_value = 0.0
+    is_x_positive = is_positive(nodes, links, coords_xyz.outputs["X"])
+    is_x_negative = invert(nodes, links, is_x_positive)
 
-    is_y_positive = nodes.new("ShaderNodeMath")
-    is_y_positive.operation = "GREATER_THAN"
-    links.new(coords_xyz.outputs["Y"], is_y_positive.inputs[0])
-    is_y_positive.inputs[1].default_value = 0.0
+    is_y_positive = is_positive(nodes, links, coords_xyz.outputs["Y"])
+    is_y_negative = invert(nodes, links, is_y_positive)
 
-    is_z_positive = nodes.new("ShaderNodeMath")
-    is_z_positive.operation = "GREATER_THAN"
-    links.new(coords_xyz.outputs["Z"], is_z_positive.inputs[0])
-    is_z_positive.inputs[1].default_value = 0.0
+    is_z_positive = is_positive(nodes, links, coords_xyz.outputs["Z"])
+    is_z_negative = invert(nodes, links, is_z_positive)
 
     neg_coords = nodes.new("ShaderNodeVectorMath")
     neg_coords.operation = "MULTIPLY"
@@ -479,31 +473,38 @@ def cube_coords_node_group(name: str):
     abs_coords.operation = "ABSOLUTE"
     links.new(coords.outputs["Reflection"], abs_coords.inputs["Vector"])
 
-    abs_coords_xyz = nodes.new("ShaderNodeSeparateXYZ")
-    links.new(abs_coords.outputs["Vector"], abs_coords_xyz.inputs["Vector"])
+    abs_xyz = nodes.new("ShaderNodeSeparateXYZ")
+    links.new(abs_coords.outputs["Vector"], abs_xyz.inputs["Vector"])
 
     max_abs_xy = nodes.new("ShaderNodeMath")
     max_abs_xy.operation = "MAXIMUM"
-    links.new(abs_coords_xyz.outputs["X"], max_abs_xy.inputs[0])
-    links.new(abs_coords_xyz.outputs["Y"], max_abs_xy.inputs[1])
+    links.new(abs_xyz.outputs["X"], max_abs_xy.inputs[0])
+    links.new(abs_xyz.outputs["Y"], max_abs_xy.inputs[1])
 
     max_abs_xyz = nodes.new("ShaderNodeMath")
     max_abs_xyz.operation = "MAXIMUM"
     links.new(max_abs_xy.outputs["Value"], max_abs_xyz.inputs[0])
-    links.new(abs_coords_xyz.outputs["Z"], max_abs_xyz.inputs[1])
+    links.new(abs_xyz.outputs["Z"], max_abs_xyz.inputs[1])
 
     # Create 0.0 or 1.0 factors for the condition for each cube face.
-    # TODO: helper functions to clean this up
-    is_abs_x_greatest = nodes.new("ShaderNodeMath")
-    is_abs_x_greatest.operation = "COMPARE"
-    links.new(abs_coords_xyz.outputs["X"], is_abs_x_greatest.inputs[0])
-    links.new(max_abs_xyz.outputs["Value"], is_abs_x_greatest.inputs[1])
-    is_abs_x_greatest.inputs[2].default_value = 0.001
+    is_face_positive_x, is_face_negative_x = is_face_positive_negative(
+        nodes, links, is_x_positive, is_x_negative, abs_xyz, max_abs_xyz, "X"
+    )
+    is_face_positive_y, is_face_negative_y = is_face_positive_negative(
+        nodes, links, is_y_positive, is_y_negative, abs_xyz, max_abs_xyz, "Y"
+    )
+    is_face_positive_z, is_face_negative_z = is_face_positive_negative(
+        nodes, links, is_z_positive, is_z_negative, abs_xyz, max_abs_xyz, "Z"
+    )
 
-    is_face_positive_x = nodes.new("ShaderNodeMath")
-    is_face_positive_x.operation = "MULTIPLY"
-    links.new(is_x_positive.outputs["Value"], is_face_positive_x.inputs[0])
-    links.new(is_abs_x_greatest.outputs["Value"], is_face_positive_x.inputs[1])
+    face_factors = [
+        is_face_positive_x,
+        is_face_negative_x,
+        is_face_positive_y,
+        is_face_negative_y,
+        is_face_positive_z,
+        is_face_negative_z,
+    ]
 
     # TODO: calculate the conditions for the remaining faces
     uc = chained_select(
@@ -517,14 +518,7 @@ def cube_coords_node_group(name: str):
             coords_xyz.outputs["X"],
             neg_coords_xyz.outputs["X"],
         ],
-        [
-            is_face_positive_x,
-            is_face_positive_x,
-            is_face_positive_x,
-            is_face_positive_x,
-            is_face_positive_x,
-            is_face_positive_x,
-        ],
+        face_factors,
         coords_xyz.outputs["Z"],
     )
 
@@ -539,14 +533,7 @@ def cube_coords_node_group(name: str):
             coords_xyz.outputs["Y"],
             coords_xyz.outputs["Y"],
         ],
-        [
-            is_face_positive_x,
-            is_face_positive_x,
-            is_face_positive_x,
-            is_face_positive_x,
-            is_face_positive_x,
-            is_face_positive_x,
-        ],
+        face_factors,
         coords_xyz.outputs["Y"],
     )
 
@@ -561,14 +548,7 @@ def cube_coords_node_group(name: str):
             4.0 / 6.0,
             5.0 / 6.0,
         ],
-        [
-            is_face_positive_x,
-            is_face_positive_x,
-            is_face_positive_x,
-            is_face_positive_x,
-            is_face_positive_x,
-            is_face_positive_x,
-        ],
+        face_factors,
         0.0,
     )
 
@@ -586,7 +566,7 @@ def cube_coords_node_group(name: str):
     map_range.operation = "MULTIPLY_ADD"
     links.new(coords_xyz_over_axis.outputs["Vector"], map_range.inputs[0])
     map_range.inputs[1].default_value = (0.5, 0.5, 0.5)
-    map_range.inputs[1].default_value = (0.5, 0.5, 0.5)
+    map_range.inputs[2].default_value = (0.5, 0.5, 0.0)
 
     # Modify the UVs based on the face index for a vertical layout.
     # TODO: is this the correct coordinate to modify?
@@ -606,12 +586,57 @@ def cube_coords_node_group(name: str):
     links.new(apply_index_scale.outputs["Vector"], apply_index.inputs[1])
     links.new(apply_index_offset.outputs["Vector"], apply_index.inputs[2])
 
+    # TODO: Figure out why the cube face images are flipped.
     output_node = nodes.new("NodeGroupOutput")
     links.new(apply_index.outputs["Vector"], output_node.inputs["Vector"])
 
     layout_nodes(output_node, links)
 
     return node_tree
+
+
+def is_positive(nodes, links, output):
+    result = nodes.new("ShaderNodeMath")
+    result.operation = "GREATER_THAN"
+    links.new(output, result.inputs[0])
+    result.inputs[1].default_value = 0.0
+    return result
+
+
+def invert(nodes, links, is_positive):
+    result = nodes.new("ShaderNodeMath")
+    result.operation = "SUBTRACT"
+    result.inputs[0].default_value = 1.0
+    links.new(is_positive.outputs["Value"], result.inputs[1])
+    return result
+
+
+def is_face_positive_negative(
+    nodes, links, is_positive, is_negative, abs_xyz, max_abs_xyz, coord: str
+):
+    is_abs_coord_greatest = compare_values(
+        nodes, links, abs_xyz.outputs[coord], max_abs_xyz.outputs["Value"]
+    )
+
+    is_face_positive_x = nodes.new("ShaderNodeMath")
+    is_face_positive_x.operation = "MULTIPLY"
+    links.new(is_positive.outputs["Value"], is_face_positive_x.inputs[0])
+    links.new(is_abs_coord_greatest.outputs["Value"], is_face_positive_x.inputs[1])
+
+    is_face_negative_x = nodes.new("ShaderNodeMath")
+    is_face_negative_x.operation = "MULTIPLY"
+    links.new(is_negative.outputs["Value"], is_face_negative_x.inputs[0])
+    links.new(is_abs_coord_greatest.outputs["Value"], is_face_negative_x.inputs[1])
+    return is_face_positive_x, is_face_negative_x
+
+
+def compare_values(nodes, links, a, b):
+    is_value_equal = nodes.new("ShaderNodeMath")
+    is_value_equal.operation = "COMPARE"
+    links.new(a, is_value_equal.inputs[0])
+    links.new(b, is_value_equal.inputs[1])
+    is_value_equal.inputs[2].default_value = 0.001
+    return is_value_equal
 
 
 def chained_select(
