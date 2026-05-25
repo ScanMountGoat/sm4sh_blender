@@ -6,6 +6,7 @@ import bpy
 
 from sm4sh_blender.node_group import (
     create_node_group,
+    cube_coords_node_group,
     dot4_node_group,
     geometry_bitangent_node_group,
     geometry_normal_node_group,
@@ -820,10 +821,10 @@ def assign_uvs(texcoords: list[int], expr_outputs, node, nodes, links):
     uv_name = f"uv{texcoords}"
     uv_node = nodes.get(uv_name)
     if uv_node is None:
-        uv_node = nodes.new("ShaderNodeCombineXYZ")
-        uv_node.name = uv_name
+        if len(texcoords) == 2:
+            uv_node = nodes.new("ShaderNodeCombineXYZ")
+            uv_node.name = uv_name
 
-        if len(texcoords) >= 2:
             assign_index(
                 texcoords[0],
                 expr_outputs,
@@ -836,6 +837,14 @@ def assign_uvs(texcoords: list[int], expr_outputs, node, nodes, links):
                 links,
                 uv_node.inputs["Y"],
             )
+        elif len(texcoords) == 3:
+            # TODO: Assign the texcoords instead of assuming the reflection vector.
+            uv_node = create_node_group(nodes, "CubeCoords", cube_coords_node_group)
+            uv_node.name = uv_name
+        else:
+            # TODO: warn if texcoords do not have 2 or 3 coords?
+            uv_node = nodes.new("ShaderNodeCombineXYZ")
+            uv_node.name = uv_name
 
     links.new(uv_node.outputs["Vector"], node.inputs["Vector"])
 

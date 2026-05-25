@@ -379,39 +379,6 @@ def transform_vector_node_group(name: str):
     return node_tree
 
 
-def geometry_bitangent_node_group(name: str):
-    node_tree = bpy.data.node_groups.new(name, "ShaderNodeTree")
-
-    node_tree.interface.new_socket(
-        in_out="OUTPUT", socket_type="NodeSocketFloat", name="X"
-    )
-    node_tree.interface.new_socket(
-        in_out="OUTPUT", socket_type="NodeSocketFloat", name="Y"
-    )
-    node_tree.interface.new_socket(
-        in_out="OUTPUT", socket_type="NodeSocketFloat", name="Z"
-    )
-
-    nodes = node_tree.nodes
-    links = node_tree.links
-
-    # Blender doesn't expose this directly, but we can use a vector to select the bitangent.
-    tbn = nodes.new("ShaderNodeNormalMap")
-    tbn.inputs["Color"].default_value = (0.0, 1.0, 0.0, 1.0)
-
-    output_vector = nodes.new("ShaderNodeSeparateXYZ")
-    links.new(tbn.outputs["Vector"], output_vector.inputs["Vector"])
-
-    output_node = nodes.new("NodeGroupOutput")
-    links.new(output_vector.outputs["X"], output_node.inputs["X"])
-    links.new(output_vector.outputs["Y"], output_node.inputs["Y"])
-    links.new(output_vector.outputs["Z"], output_node.inputs["Z"])
-
-    layout_nodes(output_node, links)
-
-    return node_tree
-
-
 def geometry_tangent_node_group(name: str):
     return geometry_tbn_node_group_inner(name, (1.0, 0.0, 0.0, 1.0))
 
@@ -455,3 +422,225 @@ def geometry_tbn_node_group_inner(name: str, rgba: Tuple[float, float, float, fl
     layout_nodes(output_node, links)
 
     return node_tree
+
+
+def cube_coords_node_group(name: str):
+    node_tree = bpy.data.node_groups.new(name, "ShaderNodeTree")
+
+    node_tree.interface.new_socket(
+        in_out="OUTPUT", socket_type="NodeSocketVector", name="Vector"
+    )
+
+    nodes = node_tree.nodes
+    links = node_tree.links
+
+    # TODO: take 3 coords as input instead of assuming reflection?
+    # input_node = nodes.new("NodeGroupInput")
+    # node_tree.interface.new_socket(
+    #     in_out="INPUT", socket_type="NodeSocketFloat", name="X"
+    # )
+    # node_tree.interface.new_socket(
+    #     in_out="INPUT", socket_type="NodeSocketFloat", name="Y"
+    # )
+    # node_tree.interface.new_socket(
+    #     in_out="INPUT", socket_type="NodeSocketFloat", name="Z"
+    # )
+
+    # XYZ cube coordinates to UV: https://en.wikipedia.org/wiki/Cube_mapping
+    coords = nodes.new("ShaderNodeTexCoord")
+
+    coords_xyz = nodes.new("ShaderNodeSeparateXYZ")
+    links.new(coords.outputs["Reflection"], coords_xyz.inputs["Vector"])
+
+    is_x_positive = nodes.new("ShaderNodeMath")
+    is_x_positive.operation = "GREATER_THAN"
+    links.new(coords_xyz.outputs["X"], is_x_positive.inputs[0])
+    is_x_positive.inputs[1].default_value = 0.0
+
+    is_y_positive = nodes.new("ShaderNodeMath")
+    is_y_positive.operation = "GREATER_THAN"
+    links.new(coords_xyz.outputs["Y"], is_y_positive.inputs[0])
+    is_y_positive.inputs[1].default_value = 0.0
+
+    is_z_positive = nodes.new("ShaderNodeMath")
+    is_z_positive.operation = "GREATER_THAN"
+    links.new(coords_xyz.outputs["Z"], is_z_positive.inputs[0])
+    is_z_positive.inputs[1].default_value = 0.0
+
+    neg_coords = nodes.new("ShaderNodeVectorMath")
+    neg_coords.operation = "MULTIPLY"
+    links.new(coords.outputs["Reflection"], neg_coords.inputs["Vector"])
+    neg_coords.inputs[1].default_value = (-1.0, -1.0, -1.0)
+
+    neg_coords_xyz = nodes.new("ShaderNodeSeparateXYZ")
+    links.new(neg_coords.outputs["Vector"], neg_coords_xyz.inputs["Vector"])
+
+    abs_coords = nodes.new("ShaderNodeVectorMath")
+    abs_coords.operation = "ABSOLUTE"
+    links.new(coords.outputs["Reflection"], abs_coords.inputs["Vector"])
+
+    abs_coords_xyz = nodes.new("ShaderNodeSeparateXYZ")
+    links.new(abs_coords.outputs["Vector"], abs_coords_xyz.inputs["Vector"])
+
+    max_abs_xy = nodes.new("ShaderNodeMath")
+    max_abs_xy.operation = "MAXIMUM"
+    links.new(abs_coords_xyz.outputs["X"], max_abs_xy.inputs[0])
+    links.new(abs_coords_xyz.outputs["Y"], max_abs_xy.inputs[1])
+
+    max_abs_xyz = nodes.new("ShaderNodeMath")
+    max_abs_xyz.operation = "MAXIMUM"
+    links.new(max_abs_xy.outputs["Value"], max_abs_xyz.inputs[0])
+    links.new(abs_coords_xyz.outputs["Z"], max_abs_xyz.inputs[1])
+
+    # Create 0.0 or 1.0 factors for the condition for each cube face.
+    # TODO: helper functions to clean this up
+    is_abs_x_greatest = nodes.new("ShaderNodeMath")
+    is_abs_x_greatest.operation = "COMPARE"
+    links.new(abs_coords_xyz.outputs["X"], is_abs_x_greatest.inputs[0])
+    links.new(max_abs_xyz.outputs["Value"], is_abs_x_greatest.inputs[1])
+    is_abs_x_greatest.inputs[2].default_value = 0.001
+
+    is_face_positive_x = nodes.new("ShaderNodeMath")
+    is_face_positive_x.operation = "MULTIPLY"
+    links.new(is_x_positive.outputs["Value"], is_face_positive_x.inputs[0])
+    links.new(is_abs_x_greatest.outputs["Value"], is_face_positive_x.inputs[1])
+
+    # TODO: calculate the conditions for the remaining faces
+    uc = chained_select(
+        nodes,
+        links,
+        [
+            neg_coords_xyz.outputs["Z"],
+            coords_xyz.outputs["Z"],
+            coords_xyz.outputs["X"],
+            coords_xyz.outputs["X"],
+            coords_xyz.outputs["X"],
+            neg_coords_xyz.outputs["X"],
+        ],
+        [
+            is_face_positive_x,
+            is_face_positive_x,
+            is_face_positive_x,
+            is_face_positive_x,
+            is_face_positive_x,
+            is_face_positive_x,
+        ],
+        coords_xyz.outputs["Z"],
+    )
+
+    vc = chained_select(
+        nodes,
+        links,
+        [
+            coords_xyz.outputs["Y"],
+            coords_xyz.outputs["Y"],
+            neg_coords_xyz.outputs["Z"],
+            coords_xyz.outputs["Z"],
+            coords_xyz.outputs["Y"],
+            coords_xyz.outputs["Y"],
+        ],
+        [
+            is_face_positive_x,
+            is_face_positive_x,
+            is_face_positive_x,
+            is_face_positive_x,
+            is_face_positive_x,
+            is_face_positive_x,
+        ],
+        coords_xyz.outputs["Y"],
+    )
+
+    index_offset = chained_select(
+        nodes,
+        links,
+        [
+            0.0 / 6.0,
+            1.0 / 6.0,
+            2.0 / 6.0,
+            3.0 / 6.0,
+            4.0 / 6.0,
+            5.0 / 6.0,
+        ],
+        [
+            is_face_positive_x,
+            is_face_positive_x,
+            is_face_positive_x,
+            is_face_positive_x,
+            is_face_positive_x,
+            is_face_positive_x,
+        ],
+        0.0,
+    )
+
+    coords_xyz = nodes.new("ShaderNodeCombineXYZ")
+    assign_float(links, coords_xyz.inputs["X"], uc)
+    assign_float(links, coords_xyz.inputs["Y"], vc)
+
+    coords_xyz_over_axis = nodes.new("ShaderNodeVectorMath")
+    coords_xyz_over_axis.operation = "DIVIDE"
+    links.new(coords_xyz.outputs["Vector"], coords_xyz_over_axis.inputs[0])
+    links.new(max_abs_xyz.outputs["Value"], coords_xyz_over_axis.inputs[1])
+
+    # Map range from -1 to 1 to 0 to 1
+    map_range = nodes.new("ShaderNodeVectorMath")
+    map_range.operation = "MULTIPLY_ADD"
+    links.new(coords_xyz_over_axis.outputs["Vector"], map_range.inputs[0])
+    map_range.inputs[1].default_value = (0.5, 0.5, 0.5)
+    map_range.inputs[1].default_value = (0.5, 0.5, 0.5)
+
+    # Modify the UVs based on the face index for a vertical layout.
+    # TODO: is this the correct coordinate to modify?
+    apply_index_scale = nodes.new("ShaderNodeCombineXYZ")
+    apply_index_scale.inputs["X"].default_value = 1.0
+    apply_index_scale.inputs["Y"].default_value = 1.0 / 6.0
+    apply_index_scale.inputs["Z"].default_value = 1.0
+
+    apply_index_offset = nodes.new("ShaderNodeCombineXYZ")
+    apply_index_offset.inputs["X"].default_value = 0.0
+    assign_float(links, apply_index_offset.inputs["Y"], index_offset)
+    apply_index_offset.inputs["Z"].default_value = 0.0
+
+    apply_index = nodes.new("ShaderNodeVectorMath")
+    apply_index.operation = "MULTIPLY_ADD"
+    links.new(map_range.outputs["Vector"], apply_index.inputs[0])
+    links.new(apply_index_scale.outputs["Vector"], apply_index.inputs[1])
+    links.new(apply_index_offset.outputs["Vector"], apply_index.inputs[2])
+
+    output_node = nodes.new("NodeGroupOutput")
+    links.new(apply_index.outputs["Vector"], output_node.inputs["Vector"])
+
+    layout_nodes(output_node, links)
+
+    return node_tree
+
+
+def chained_select(
+    nodes,
+    links,
+    values: list[bpy.types.NodeSocket | float],
+    factors: list[bpy.types.Node],
+    default_value: bpy.types.NodeSocket | float,
+) -> bpy.types.NodeSocket | float:
+    result = default_value
+
+    # Chain selects together to mimic a switch statement.
+    for value, factor in zip(values, factors):
+        # Replace the previous result with the new value if factor is 1.0.
+        mix = nodes.new("ShaderNodeMix")
+        mix.data_type = "FLOAT"
+        assign_float(links, mix.inputs["A"], result)
+        assign_float(links, mix.inputs["B"], value)
+        links.new(factor.outputs["Value"], mix.inputs["Factor"])
+
+        result = mix.outputs["Result"]
+
+    return result
+
+
+def assign_float(
+    links, output: bpy.types.NodeSocketFloat, f: bpy.types.NodeSocket | float
+):
+    try:
+        output.default_value = f
+    except:
+        links.new(f, output)
