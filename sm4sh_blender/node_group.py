@@ -697,3 +697,43 @@ def assign_float(
         output.default_value = f
     except:
         links.new(f, output)
+
+
+def eye_vector_node_group(name: str):
+    node_tree = bpy.data.node_groups.new(name, "ShaderNodeTree")
+
+    node_tree.interface.new_socket(
+        in_out="OUTPUT", socket_type="NodeSocketFloat", name="X"
+    )
+    node_tree.interface.new_socket(
+        in_out="OUTPUT", socket_type="NodeSocketFloat", name="Y"
+    )
+    node_tree.interface.new_socket(
+        in_out="OUTPUT", socket_type="NodeSocketFloat", name="Z"
+    )
+    nodes = node_tree.nodes
+    links = node_tree.links
+
+    camera_data = nodes.new("ShaderNodeCameraData")
+
+    negate_z = nodes.new("ShaderNodeVectorMath")
+    negate_z.operation = "MULTIPLY"
+    links.new(camera_data.outputs["View Vector"], negate_z.inputs[0])
+    negate_z.inputs[1].default_value = (1.0, 1.0, -1.0)
+
+    camera_to_object = nodes.new("ShaderNodeVectorTransform")
+    camera_to_object.convert_from = "CAMERA"
+    camera_to_object.convert_to = "OBJECT"
+    links.new(negate_z.outputs["Vector"], camera_to_object.inputs["Vector"])
+
+    output_xyz = nodes.new("ShaderNodeSeparateXYZ")
+    links.new(camera_to_object.outputs["Vector"], output_xyz.inputs["Vector"])
+
+    output_node = nodes.new("NodeGroupOutput")
+    links.new(output_xyz.outputs["X"], output_node.inputs["X"])
+    links.new(output_xyz.outputs["Y"], output_node.inputs["Y"])
+    links.new(output_xyz.outputs["Z"], output_node.inputs["Z"])
+
+    layout_nodes(output_node, links)
+
+    return node_tree

@@ -8,6 +8,7 @@ from sm4sh_blender.node_group import (
     create_node_group,
     cube_coords_node_group,
     dot4_node_group,
+    eye_vector_node_group,
     geometry_bitangent_node_group,
     geometry_normal_node_group,
     geometry_tangent_node_group,
@@ -708,6 +709,13 @@ def assign_attribute(
             return assign_attribute_node(nodes, links, name, channel, "UV1")
         case "a_TexCoord2":
             return assign_attribute_node(nodes, links, name, channel, "UV2")
+        case "eye":
+            node = nodes.get(name)
+            if node is None:
+                node = create_node_group(nodes, "EyeVector", eye_vector_node_group)
+                node.name = name
+
+            return node, channel_name(channel)
         case "bitangent_sign":
             # TODO: Is there a way to calculate this?
             return None
