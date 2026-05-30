@@ -225,8 +225,19 @@ def create_material(
                     output_color.inputs[channel],
                 )
 
-        # TODO: Recreate the in game gamma correction and value range remapping from bloom.
-        links.new(output_color.outputs["Color"], final_emission.inputs["Color"])
+        # Recreate the in game gamma correction and value range remapping from bloom.
+        multiply2 = nodes.new("ShaderNodeMix")
+        multiply2.data_type = "RGBA"
+        multiply2.blend_type = "MULTIPLY"
+        links.new(output_color.outputs["Color"], multiply2.inputs["A"])
+        multiply2.inputs["B"].default_value = (2.0, 2.0, 2.0, 1.0)
+        multiply2.inputs["Factor"].default_value = 1.0
+
+        gamma = nodes.new("ShaderNodeGamma")
+        links.new(multiply2.outputs["Result"], gamma.inputs["Color"])
+        gamma.inputs["Gamma"].default_value = 2.2
+
+        links.new(gamma.outputs[0], final_emission.inputs["Color"])
 
         # Recreate alpha blending.
         # TODO: Support additive and multiply blend modes.
