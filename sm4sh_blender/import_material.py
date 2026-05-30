@@ -5,10 +5,13 @@ from typing import Dict, Optional, Tuple
 import bpy
 
 from sm4sh_blender.node_group import (
+    anisotropic_spec_node_group,
+    blinn_phong_spec_node_group,
     create_node_group,
     cube_coords_node_group,
     dot4_node_group,
     eye_vector_node_group,
+    fresnel_node_group,
     geometry_bitangent_node_group,
     geometry_normal_node_group,
     geometry_tangent_node_group,
@@ -570,6 +573,70 @@ def assign_output(
                 )
                 assign_args(func, node, ["X", "Y", "Z"])
                 return node, "Z"
+            case sm4sh_model_py.database.Operation.VarianceShadow:
+                # Shadow mapping is already handled by Blender.
+                node = nodes.new("ShaderNodeValue")
+                node.outputs[0].default_value = 1.0
+                return node, "Value"
+            case sm4sh_model_py.database.Operation.BlinnPhongSpecular:
+                node = group_node(
+                    func, "BlinnPhongSpecular", blinn_phong_spec_node_group
+                )
+                assign_args(
+                    func,
+                    node,
+                    [
+                        "normal.X",
+                        "normal.Y",
+                        "normal.Z",
+                        "lightDir.X",
+                        "lightDir.Y",
+                        "lightDir.Z",
+                        "eye.X",
+                        "eye.Y",
+                        "eye.Z",
+                        "Exponent",
+                    ],
+                )
+                return node, "Value"
+            case sm4sh_model_py.database.Operation.AnisotropicSpecular:
+                node = group_node(
+                    func, "AnisotropicSpecular", anisotropic_spec_node_group
+                )
+                assign_args(
+                    func,
+                    node,
+                    [
+                        "normal.X",
+                        "normal.Y",
+                        "normal.Z",
+                        "tangent.X",
+                        "tangent.Y",
+                        "tangent.Z",
+                        "eye.X",
+                        "eye.Y",
+                        "eye.Z",
+                        "ParamX",
+                        "ParamY",
+                    ],
+                )
+                return node, "Value"
+            case sm4sh_model_py.database.Operation.Fresnel:
+                node = group_node(func, "Fresnel", fresnel_node_group)
+                assign_args(
+                    func,
+                    node,
+                    [
+                        "normal.X",
+                        "normal.Y",
+                        "normal.Z",
+                        "eye.X",
+                        "eye.Y",
+                        "eye.Z",
+                        "Param",
+                    ],
+                )
+                return node, "Value"
             case sm4sh_model_py.database.Operation.Unk:
                 return None
             case _:

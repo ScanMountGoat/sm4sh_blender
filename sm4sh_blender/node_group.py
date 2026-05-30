@@ -737,3 +737,338 @@ def eye_vector_node_group(name: str):
     layout_nodes(output_node, links)
 
     return node_tree
+
+
+def blinn_phong_spec_node_group(name: str):
+    node_tree = bpy.data.node_groups.new(name, "ShaderNodeTree")
+
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="normal.X"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="normal.Y"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="normal.Z"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="lightDir.X"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="lightDir.Y"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="lightDir.Z"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="eye.X"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="eye.Y"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="eye.Z"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="Exponent"
+    )
+    node_tree.interface.new_socket(
+        in_out="OUTPUT", socket_type="NodeSocketFloat", name="Value"
+    )
+    nodes = node_tree.nodes
+    links = node_tree.links
+
+    input_node = nodes.new("NodeGroupInput")
+
+    n_xyz = nodes.new("ShaderNodeCombineXYZ")
+    links.new(input_node.outputs["normal.X"], n_xyz.inputs["X"])
+    links.new(input_node.outputs["normal.Y"], n_xyz.inputs["Y"])
+    links.new(input_node.outputs["normal.Z"], n_xyz.inputs["Z"])
+
+    light_dir_xyz = nodes.new("ShaderNodeCombineXYZ")
+    links.new(input_node.outputs["lightDir.X"], light_dir_xyz.inputs["X"])
+    links.new(input_node.outputs["lightDir.Y"], light_dir_xyz.inputs["Y"])
+    links.new(input_node.outputs["lightDir.Z"], light_dir_xyz.inputs["Z"])
+
+    # TODO: Remove these inputs and just include the eye vector node here?
+    eye_xyz = nodes.new("ShaderNodeCombineXYZ")
+    links.new(input_node.outputs["eye.X"], eye_xyz.inputs["X"])
+    links.new(input_node.outputs["eye.Y"], eye_xyz.inputs["Y"])
+    links.new(input_node.outputs["eye.Z"], eye_xyz.inputs["Z"])
+
+    h = nodes.new("ShaderNodeVectorMath")
+    h.operation = "SUBTRACT"
+    links.new(eye_xyz.outputs["Vector"], h.inputs[0])
+    links.new(light_dir_xyz.outputs["Vector"], h.inputs[1])
+
+    normalize_h = nodes.new("ShaderNodeVectorMath")
+    normalize_h.operation = "NORMALIZE"
+    links.new(h.outputs["Vector"], normalize_h.inputs[0])
+
+    dot_n_h = nodes.new("ShaderNodeVectorMath")
+    dot_n_h.operation = "DOT_PRODUCT"
+    links.new(n_xyz.outputs["Vector"], dot_n_h.inputs[0])
+    links.new(normalize_h.outputs["Vector"], dot_n_h.inputs[1])
+
+    spec = nodes.new("ShaderNodeMath")
+    spec.operation = "MAXIMUM"
+    links.new(dot_n_h.outputs["Value"], spec.inputs[0])
+    spec.inputs[1].default_value = 0.001
+
+    spec_pow = nodes.new("ShaderNodeMath")
+    spec_pow.operation = "POWER"
+    links.new(spec.outputs["Value"], spec_pow.inputs[0])
+    links.new(input_node.outputs["Exponent"], spec_pow.inputs[1])
+
+    output_node = nodes.new("NodeGroupOutput")
+    links.new(spec_pow.outputs["Value"], output_node.inputs["Value"])
+
+    layout_nodes(output_node, links)
+
+    return node_tree
+
+
+def anisotropic_spec_node_group(name: str):
+    node_tree = bpy.data.node_groups.new(name, "ShaderNodeTree")
+
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="normal.X"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="normal.Y"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="normal.Z"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="tangent.X"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="tangent.Y"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="tangent.Z"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="eye.X"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="eye.Y"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="eye.Z"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="ParamX"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="ParamY"
+    )
+    node_tree.interface.new_socket(
+        in_out="OUTPUT", socket_type="NodeSocketFloat", name="Value"
+    )
+    nodes = node_tree.nodes
+    links = node_tree.links
+
+    input_node = nodes.new("NodeGroupInput")
+
+    n_xyz = nodes.new("ShaderNodeCombineXYZ")
+    links.new(input_node.outputs["normal.X"], n_xyz.inputs["X"])
+    links.new(input_node.outputs["normal.Y"], n_xyz.inputs["Y"])
+    links.new(input_node.outputs["normal.Z"], n_xyz.inputs["Z"])
+
+    # TODO: Remove these inputs and just include the tangent vector node here?
+    tangent_xyz = nodes.new("ShaderNodeCombineXYZ")
+    links.new(input_node.outputs["tangent.X"], tangent_xyz.inputs["X"])
+    links.new(input_node.outputs["tangent.Y"], tangent_xyz.inputs["Y"])
+    links.new(input_node.outputs["tangent.Z"], tangent_xyz.inputs["Z"])
+
+    # TODO: Remove these inputs and just include the eye vector node here?
+    eye_xyz = nodes.new("ShaderNodeCombineXYZ")
+    links.new(input_node.outputs["eye.X"], eye_xyz.inputs["X"])
+    links.new(input_node.outputs["eye.Y"], eye_xyz.inputs["Y"])
+    links.new(input_node.outputs["eye.Z"], eye_xyz.inputs["Z"])
+
+    param_x = nodes.new("ShaderNodeMath")
+    param_x.operation = "MULTIPLY"
+    links.new(input_node.outputs["ParamX"], param_x.inputs[0])
+    param_x.inputs[1].default_value = 3.0
+
+    param_x2 = nodes.new("ShaderNodeMath")
+    param_x2.operation = "MULTIPLY"
+    links.new(param_x.outputs["Value"], param_x2.inputs[0])
+    links.new(param_x.outputs["Value"], param_x2.inputs[1])
+
+    param_y = nodes.new("ShaderNodeMath")
+    param_y.operation = "MULTIPLY"
+    links.new(input_node.outputs["ParamY"], param_y.inputs[0])
+    param_y.inputs[1].default_value = 3.0
+
+    param_y2 = nodes.new("ShaderNodeMath")
+    param_y2.operation = "MULTIPLY"
+    links.new(param_y.outputs["Value"], param_y2.inputs[0])
+    links.new(param_y.outputs["Value"], param_y2.inputs[1])
+
+    dot_eye_n = nodes.new("ShaderNodeVectorMath")
+    dot_eye_n.operation = "DOT_PRODUCT"
+    links.new(eye_xyz.outputs["Vector"], dot_eye_n.inputs[0])
+    links.new(n_xyz.outputs["Vector"], dot_eye_n.inputs[1])
+
+    dot_eye_n2 = nodes.new("ShaderNodeMath")
+    dot_eye_n2.operation = "MULTIPLY"
+    links.new(dot_eye_n.outputs["Value"], dot_eye_n2.inputs[0])
+    links.new(dot_eye_n.outputs["Value"], dot_eye_n2.inputs[1])
+
+    neg_n = nodes.new("ShaderNodeVectorMath")
+    neg_n.operation = "MULTIPLY"
+    links.new(n_xyz.outputs["Vector"], neg_n.inputs[0])
+    neg_n.inputs[1].default_value = (-1.0, -1.0, -1.0)
+
+    b = nodes.new("ShaderNodeVectorMath")
+    b.operation = "MULTIPLY_ADD"
+    links.new(neg_n.outputs["Vector"], b.inputs[0])
+    links.new(dot_eye_n.outputs["Value"], b.inputs[1])
+    links.new(eye_xyz.outputs["Vector"], b.inputs[2])
+
+    normalize_b = nodes.new("ShaderNodeVectorMath")
+    normalize_b.operation = "NORMALIZE"
+    links.new(b.outputs["Vector"], normalize_b.inputs[0])
+
+    dot_tangent_b = nodes.new("ShaderNodeVectorMath")
+    dot_tangent_b.operation = "DOT_PRODUCT"
+    links.new(tangent_xyz.outputs["Vector"], dot_tangent_b.inputs[0])
+    links.new(normalize_b.outputs["Vector"], dot_tangent_b.inputs[1])
+
+    dot_tangent_b2 = nodes.new("ShaderNodeMath")
+    dot_tangent_b2.operation = "MULTIPLY"
+    links.new(dot_tangent_b.outputs["Value"], dot_tangent_b2.inputs[0])
+    links.new(dot_tangent_b.outputs["Value"], dot_tangent_b2.inputs[1])
+
+    x_term = nodes.new("ShaderNodeMath")
+    x_term.operation = "DIVIDE"
+    links.new(dot_tangent_b2.outputs["Value"], x_term.inputs[0])
+    links.new(param_x2.outputs["Value"], x_term.inputs[1])
+
+    one_minus_dot_tangent_b2 = nodes.new("ShaderNodeMath")
+    one_minus_dot_tangent_b2.operation = "SUBTRACT"
+    one_minus_dot_tangent_b2.inputs[0].default_value = 1.0
+    links.new(dot_tangent_b2.outputs["Value"], one_minus_dot_tangent_b2.inputs[1])
+
+    y_term = nodes.new("ShaderNodeMath")
+    y_term.operation = "DIVIDE"
+    links.new(one_minus_dot_tangent_b2.outputs["Value"], y_term.inputs[0])
+    links.new(param_y2.outputs["Value"], y_term.inputs[1])
+
+    terms = nodes.new("ShaderNodeMath")
+    terms.operation = "ADD"
+    links.new(x_term.outputs["Value"], terms.inputs[0])
+    links.new(y_term.outputs["Value"], terms.inputs[1])
+
+    dot_eye_n2_minus_one = nodes.new("ShaderNodeMath")
+    dot_eye_n2_minus_one.operation = "SUBTRACT"
+    links.new(dot_eye_n2.outputs["Value"], dot_eye_n2_minus_one.inputs[0])
+    dot_eye_n2_minus_one.inputs[1].default_value = 1.0
+
+    spec = nodes.new("ShaderNodeMath")
+    spec.operation = "DIVIDE"
+    links.new(dot_eye_n2_minus_one.outputs["Value"], spec.inputs[0])
+    links.new(dot_eye_n2.outputs["Value"], spec.inputs[1])
+
+    spec_terms = nodes.new("ShaderNodeMath")
+    spec_terms.operation = "MULTIPLY"
+    links.new(spec.outputs["Value"], spec_terms.inputs[0])
+    links.new(terms.outputs["Value"], spec_terms.inputs[1])
+
+    spec_terms_const = nodes.new("ShaderNodeMath")
+    spec_terms_const.operation = "MULTIPLY"
+    links.new(spec_terms.outputs["Value"], spec_terms_const.inputs[0])
+    spec_terms_const.inputs[1].default_value = 1.442695
+
+    spec_pow = nodes.new("ShaderNodeMath")
+    spec_pow.operation = "POWER"
+    spec_pow.inputs[0].default_value = 2.0
+    links.new(spec_terms_const.outputs["Value"], spec_pow.inputs[1])
+
+    output_node = nodes.new("NodeGroupOutput")
+    links.new(spec_pow.outputs["Value"], output_node.inputs["Value"])
+
+    layout_nodes(output_node, links)
+
+    return node_tree
+
+
+def fresnel_node_group(name: str):
+    node_tree = bpy.data.node_groups.new(name, "ShaderNodeTree")
+
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="normal.X"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="normal.Y"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="normal.Z"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="eye.X"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="eye.Y"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="eye.Z"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="Param"
+    )
+    node_tree.interface.new_socket(
+        in_out="OUTPUT", socket_type="NodeSocketFloat", name="Value"
+    )
+    nodes = node_tree.nodes
+    links = node_tree.links
+
+    input_node = nodes.new("NodeGroupInput")
+
+    n_xyz = nodes.new("ShaderNodeCombineXYZ")
+    links.new(input_node.outputs["normal.X"], n_xyz.inputs["X"])
+    links.new(input_node.outputs["normal.Y"], n_xyz.inputs["Y"])
+    links.new(input_node.outputs["normal.Z"], n_xyz.inputs["Z"])
+
+    # TODO: Remove these inputs and just include the eye vector node here?
+    eye_xyz = nodes.new("ShaderNodeCombineXYZ")
+    links.new(input_node.outputs["eye.X"], eye_xyz.inputs["X"])
+    links.new(input_node.outputs["eye.Y"], eye_xyz.inputs["Y"])
+    links.new(input_node.outputs["eye.Z"], eye_xyz.inputs["Z"])
+
+    dot_eye_n = nodes.new("ShaderNodeVectorMath")
+    dot_eye_n.operation = "DOT_PRODUCT"
+    links.new(eye_xyz.outputs["Vector"], dot_eye_n.inputs[0])
+    links.new(n_xyz.outputs["Vector"], dot_eye_n.inputs[1])
+
+    dot_eye_n_clamp = nodes.new("ShaderNodeClamp")
+    dot_eye_n_clamp.clamp_type = "MINMAX"
+    links.new(dot_eye_n.outputs["Value"], dot_eye_n_clamp.inputs["Value"])
+    dot_eye_n_clamp.inputs["Min"].default_value = 0.0
+    dot_eye_n_clamp.inputs["Max"].default_value = 1.0
+
+    fresnel = nodes.new("ShaderNodeMath")
+    fresnel.operation = "SUBTRACT"
+    fresnel.inputs[0].default_value = 1.0
+    links.new(dot_eye_n_clamp.outputs["Result"], fresnel.inputs[1])
+
+    one_plus_param = nodes.new("ShaderNodeMath")
+    one_plus_param.operation = "ADD"
+    one_plus_param.inputs[0].default_value = 1.0
+    links.new(input_node.outputs["Param"], one_plus_param.inputs[1])
+
+    fresnel_pow = nodes.new("ShaderNodeMath")
+    fresnel_pow.operation = "POWER"
+    links.new(fresnel.outputs["Value"], fresnel_pow.inputs[0])
+    links.new(one_plus_param.outputs["Value"], fresnel_pow.inputs[1])
+
+    output_node = nodes.new("NodeGroupOutput")
+    links.new(fresnel_pow.outputs["Value"], output_node.inputs["Value"])
+
+    layout_nodes(output_node, links)
+
+    return node_tree
