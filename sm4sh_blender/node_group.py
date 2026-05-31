@@ -829,6 +829,7 @@ def blinn_phong_spec_node_group(name: str):
 
 
 def anisotropic_spec_node_group(name: str):
+    """A slightly modified Ward BRDF for anisotropic specular."""
     node_tree = bpy.data.node_groups.new(name, "ShaderNodeTree")
 
     node_tree.interface.new_socket(
@@ -979,18 +980,12 @@ def anisotropic_spec_node_group(name: str):
     links.new(spec.outputs["Value"], spec_terms.inputs[0])
     links.new(terms.outputs["Value"], spec_terms.inputs[1])
 
-    spec_terms_const = nodes.new("ShaderNodeMath")
-    spec_terms_const.operation = "MULTIPLY"
-    links.new(spec_terms.outputs["Value"], spec_terms_const.inputs[0])
-    spec_terms_const.inputs[1].default_value = 1.442695
-
-    spec_pow = nodes.new("ShaderNodeMath")
-    spec_pow.operation = "POWER"
-    spec_pow.inputs[0].default_value = 2.0
-    links.new(spec_terms_const.outputs["Value"], spec_pow.inputs[1])
+    spec_exp = nodes.new("ShaderNodeMath")
+    spec_exp.operation = "EXPONENT"
+    links.new(spec_terms.outputs["Value"], spec_exp.inputs[0])
 
     output_node = nodes.new("NodeGroupOutput")
-    links.new(spec_pow.outputs["Value"], output_node.inputs["Value"])
+    links.new(spec_exp.outputs["Value"], output_node.inputs["Value"])
 
     layout_nodes(output_node, links)
 
