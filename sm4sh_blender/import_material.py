@@ -386,11 +386,11 @@ def material_images_samplers(material, blender_images, samplers):
 def assign_output(
     shader: sm4sh_model_py.database.ShaderProgram,
     expr: sm4sh_model_py.database.OutputExpr,
-    expr_outputs: list[Optional[Tuple[bpy.types.Node, str]]],
+    expr_outputs: list[Optional[Tuple[bpy.types.Node, str] | float]],
     nodes,
     links,
     textures: Dict[str, Optional[bpy.types.Image]],
-) -> Optional[Tuple[bpy.types.Node, str]]:
+) -> Optional[Tuple[bpy.types.Node, str] | float]:
     if func := expr.func():
 
         def mix_rgba_node(ty):
@@ -661,15 +661,18 @@ def assign_output(
 
 def assign_index(
     i: Optional[int],
-    expr_outputs: list[Optional[Tuple[bpy.types.Node, str]]],
+    expr_outputs: list[Optional[Tuple[bpy.types.Node, str] | float]],
     links,
     output,
 ):
     if i is not None:
         if node_output := expr_outputs[i]:
-            node, output_name = node_output
-            links.new(node.outputs[output_name], output)
-            return
+            if isinstance(node_output, float):
+                # Assign floats directly to reduce links and improve load times.
+                assign_float(output, node_output)
+            else:
+                node, output_name = node_output
+                links.new(node.outputs[output_name], output)
         else:
             # Set defaults to match xc3_wgpu and make debugging easier.
             assign_float(output, 0.0)
@@ -678,19 +681,18 @@ def assign_index(
 def assign_value(
     shader: sm4sh_model_py.database.ShaderProgram,
     value: sm4sh_model_py.database.Value,
-    expr_outputs: list[Optional[Tuple[bpy.types.Node, str]]],
+    expr_outputs: list[Optional[Tuple[bpy.types.Node, str] | float]],
     nodes,
     links,
     textures,
-) -> Optional[Tuple[bpy.types.Node, str]]:
+) -> Optional[Tuple[bpy.types.Node, str] | float]:
     if i := value.int():
         node = nodes.new("ShaderNodeValue")
         node.outputs[0].default_value = i
         return node, "Value"
     elif f := value.float():
-        node = nodes.new("ShaderNodeValue")
-        node.outputs[0].default_value = f
-        return node, "Value"
+        # Don't create nodes or links for constants to improve loading times.
+        return f
     elif parameter := value.parameter():
         return assign_parameter(shader, parameter, nodes, links)
     elif attribute := value.attribute():
@@ -862,7 +864,7 @@ def channel_name(channel: Optional[str]) -> str:
 
 def assign_mix_rgba(
     func: sm4sh_model_py.database.OutputExprFunc,
-    expr_outputs: list[Optional[Tuple[bpy.types.Node, str]]],
+    expr_outputs: list[Optional[Tuple[bpy.types.Node, str] | float]],
     nodes,
     links,
     blend_type: str,
@@ -885,7 +887,7 @@ def assign_mix_rgba(
 
 def assign_texture(
     texture: sm4sh_model_py.database.Texture,
-    expr_outputs: list[Optional[Tuple[bpy.types.Node, str]]],
+    expr_outputs: list[Optional[Tuple[bpy.types.Node, str] | float]],
     nodes,
     links,
     textures: Dict[str, bpy.types.Image],
@@ -955,7 +957,7 @@ def assign_uvs(texcoords: list[int], expr_outputs, node, nodes, links):
 
 def assign_math(
     func: sm4sh_model_py.database.OutputExprFunc,
-    expr_outputs: list[Optional[Tuple[bpy.types.Node, str]]],
+    expr_outputs: list[Optional[Tuple[bpy.types.Node, str] | float]],
     nodes,
     links,
     op: str,
@@ -1030,7 +1032,7 @@ def create_cached_func_group_node(
 def assign_func_args(
     func: sm4sh_model_py.database.OutputExprFunc,
     params: list[int | str],
-    assignment_outputs: list[Optional[Tuple[bpy.types.Node, str]]],
+    assignment_outputs: list[Optional[Tuple[bpy.types.Node, str] | float]],
     links,
     node: bpy.types.Node,
 ):
