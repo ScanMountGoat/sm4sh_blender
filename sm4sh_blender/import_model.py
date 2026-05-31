@@ -117,16 +117,24 @@ def import_mesh(
     for mesh_index, uvs in enumerate(uv_layers):
         import_uvs(operator, blender_mesh, indices, uvs, f"UV{mesh_index}")
 
-    blender_mesh.update()
-
     # The validate call may modify and reindex geometry.
-    # Assign normals now that the mesh has been updated.
+    # Assign normals to a temporary attribute to use later.
     normals = mesh.vertices.normals.normals()
     if normals is not None:
-        normals_xyz = normals[:, :3]
-        blender_mesh.normals_split_custom_set_from_vertices(normals_xyz)
+        import_colors(blender_mesh, normals, "VertexNormal")
 
+    blender_mesh.update()
     blender_mesh.validate()
+
+    # Assigning custom normals can cause crashes if the topology changes.
+    # Setting normals after updating and validating is more reliable.
+    if attribute := blender_mesh.color_attributes.get("VertexNormal"):
+        normals = np.zeros(len(blender_mesh.vertices) * 4)
+        attribute.data.foreach_get("color", normals)
+        blender_mesh.color_attributes.remove(attribute)
+        # We can't assume that the attribute data is normalized.
+        normals = normalize(normals.reshape((-1, 4))[:, :3])
+        blender_mesh.normals_split_custom_set_from_vertices(normals)
 
     # Convert from Y up to Z up.
     y_up_to_z_up = Matrix.Rotation(math.radians(90), 4, "X")
@@ -319,3 +327,10 @@ def import_image(image: sm4sh_model_py.ImageTexture, png: bytes) -> bpy.types.Im
     blender_image.sm4sh_blender.generate_mipmaps = image.mipmap_count > 1
 
     return blender_image
+
+
+def normalize(data: np.ndarray) -> np.ndarray:
+    lengths = np.linalg.norm(data, ord=2, axis=1)
+    # Prevent divide by zero.
+    lengths[lengths == 0] = 1.0
+    return data / lengths.reshape((-1, 1))

@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Changed
 * Improved rendering accuracy of experimental shader nodes.
 
+### Fixed
+* Fixed an issue where nud import would crash Blender when importing normal data in some cases.
+* Fixed an issue where material node creation would fail on import in some cases.
+
 ## 0.6.0 - 2026-05-07
 ### Added
 * Added support for exporting a generated metal.nud file on export.

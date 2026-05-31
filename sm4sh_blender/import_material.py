@@ -493,7 +493,7 @@ def assign_output(
 
                 return node, "Value"
             case sm4sh_model_py.database.Operation.Fract:
-                return mix_rgba_node("FRACT")
+                return math_node("FRACT")
             # TODO: intbitstofloat, floatbitstoint
 
             case sm4sh_model_py.database.Operation.Select:
