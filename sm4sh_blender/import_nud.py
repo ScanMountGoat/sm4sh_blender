@@ -1,12 +1,17 @@
 import os
 import time
+import typing
 from pathlib import Path
 
 import bpy
-from bpy.props import BoolProperty, CollectionProperty, StringProperty
+from bpy.props import BoolProperty, StringProperty
 from bpy_extras.io_utils import ImportHelper
 
-from . import sm4sh_model_py
+if typing.TYPE_CHECKING:
+    from sm4sh_model_py import sm4sh_model_py
+else:
+    from . import sm4sh_model_py
+
 from .import_model import (
     ImportException,
     import_nud_model,
@@ -60,8 +65,6 @@ class ImportNud(bpy.types.Operator, ImportHelper):
 
         end = time.time()
         print(f"Load Model: {end - start}")
-
-        # TODO: load metal.nud model material settings if the file exists
 
         start = time.time()
 

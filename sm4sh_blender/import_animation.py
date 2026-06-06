@@ -1,4 +1,5 @@
 import time
+import typing
 
 import bpy
 import numpy as np
@@ -7,7 +8,10 @@ from bpy_extras.io_utils import ImportHelper
 
 from sm4sh_blender.import_model import init_logging
 
-from . import sm4sh_model_py
+if typing.TYPE_CHECKING:
+    from sm4sh_model_py import sm4sh_model_py
+else:
+    from . import sm4sh_model_py
 
 
 class ImportPac(bpy.types.Operator, ImportHelper):
@@ -74,7 +78,11 @@ def import_pac(operator: bpy.types.Operator, context: bpy.types.Context, path: s
 
 
 def import_animation(
-    armature, skeleton, bone_names: dict[int, str], name: str, animation
+    armature,
+    skeleton: sm4sh_model_py.VbnSkeleton,
+    bone_names: dict[int, str],
+    name: str,
+    animation: sm4sh_model_py.animation.Animation,
 ):
     action = bpy.data.actions.new(name)
     if animation.frame_count > 0:

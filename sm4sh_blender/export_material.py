@@ -1,3 +1,4 @@
+import typing
 from typing import Optional
 
 import bpy
@@ -10,7 +11,10 @@ from sm4sh_blender.utils import (
     parse_int,
 )
 
-from . import sm4sh_model_py
+if typing.TYPE_CHECKING:
+    from sm4sh_model_py import sm4sh_model_py
+else:
+    from . import sm4sh_model_py
 
 
 class SM4SH_PT_material_export_panel(bpy.types.Panel):

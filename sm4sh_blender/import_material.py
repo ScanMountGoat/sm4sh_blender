@@ -25,7 +25,7 @@ from sm4sh_blender.node_group import (
 from sm4sh_blender.node_layout import layout_nodes
 
 if typing.TYPE_CHECKING:
-    from ..sm4sh_model_py.sm4sh_model_py import sm4sh_model_py
+    from sm4sh_model_py import sm4sh_model_py
 else:
     from . import sm4sh_model_py
 

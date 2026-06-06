@@ -2,6 +2,7 @@ import copy
 import os
 import re
 import time
+import typing
 from pathlib import Path
 
 import bpy
@@ -12,7 +13,11 @@ from sm4sh_blender.export_material import metal_material
 from sm4sh_blender.import_model import init_logging
 from sm4sh_blender.utils import extract_name
 
-from . import sm4sh_model_py
+if typing.TYPE_CHECKING:
+    from sm4sh_model_py import sm4sh_model_py
+else:
+    from . import sm4sh_model_py
+
 from .export_model import ExportException, export_mesh
 
 

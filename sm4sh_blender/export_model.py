@@ -1,4 +1,5 @@
 import math
+import typing
 from typing import Optional, Tuple
 
 import bmesh
@@ -8,7 +9,10 @@ from mathutils import Matrix
 
 from sm4sh_blender.export_material import default_material, export_material
 
-from . import sm4sh_model_py
+if typing.TYPE_CHECKING:
+    from sm4sh_model_py import sm4sh_model_py
+else:
+    from . import sm4sh_model_py
 
 
 class ExportException(Exception):

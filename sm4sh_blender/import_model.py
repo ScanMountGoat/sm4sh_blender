@@ -1,5 +1,6 @@
 import logging
 import math
+import typing
 from typing import Optional
 
 import bpy
@@ -8,7 +9,10 @@ from mathutils import Matrix
 
 from sm4sh_blender.import_material import import_material
 
-from . import sm4sh_model_py
+if typing.TYPE_CHECKING:
+    from sm4sh_model_py import sm4sh_model_py
+else:
+    from . import sm4sh_model_py
 
 
 class ImportException(Exception):
