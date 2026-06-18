@@ -1,24 +1,37 @@
 import struct
 import typing
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Set, Tuple
 
 import bpy
 
 from sm4sh_blender.node_group import (
     anisotropic_spec_node_group,
+    anisotropic_spec_node_group_xyz,
     blinn_phong_spec_node_group,
+    blinn_phong_spec_node_group_xyz,
+    clamp_xyz_node_group,
     create_node_group,
     cube_coords_node_group,
     dot4_node_group,
     eye_vector_node_group,
     fresnel_node_group,
+    fresnel_node_group_xyz,
     geometry_bitangent_node_group,
     geometry_normal_node_group,
     geometry_tangent_node_group,
+    greater_xyz_node_group,
+    inversesqrt_xyz_node_group,
+    less_xyz_node_group,
+    neg_reflect_node_group,
+    neg_reflect_node_group_xyz,
+    normal_map_node_group,
     normal_map_xyz_node_group,
     normalize_xyz_node_group,
     rgba_color_node_group,
     sphere_map_coords_node_group,
+    sqrt_xyz_node_group,
+    tint_color_node_group,
+    tint_color_node_group_xyz,
     transform_point_node_group,
     transform_vector_node_group,
 )
@@ -202,36 +215,59 @@ def create_material(
 
         # Create nodes for each unique assignment.
         # Storing the output name allows using a single node for values with multiple channels.
+        used_expr_indices, used_expr_xyz_indices = used_assignments(shader)
+
         expr_outputs = []
         for i, expr in enumerate(shader.exprs):
-            # TODO: Get the values for shared uniform buffers.
-            node_output = assign_output(
-                shader, expr, expr_outputs, nodes, links, textures
-            )
-            expr_outputs.append(node_output)
-
-        output_color = nodes.new("ShaderNodeCombineColor")
-
-        for output, channel in [
-            ("out_attr0.x", "Red"),
-            ("out_attr0.y", "Green"),
-            ("out_attr0.z", "Blue"),
-        ]:
-            if output in shader.output_dependencies:
-                assign_index(
-                    shader.output_dependencies[output],
-                    expr_outputs,
-                    links,
-                    output_color.inputs[channel],
+            if i in used_expr_indices:
+                # TODO: Get the values for shared uniform buffers.
+                node_output = assign_output(
+                    shader, expr, expr_outputs, nodes, links, textures
                 )
+                expr_outputs.append(node_output)
+            else:
+                expr_outputs.append(None)
+
+        expr_outputs_xyz = []
+        for i, expr in enumerate(shader.exprs_xyz):
+            if i in used_expr_xyz_indices:
+                node_output = assign_output_xyz(
+                    shader, expr, expr_outputs, expr_outputs_xyz, nodes, links, textures
+                )
+                expr_outputs_xyz.append(node_output)
+            else:
+                expr_outputs_xyz.append(None)
 
         # Recreate the in game gamma correction and value range remapping from bloom.
         multiply2 = nodes.new("ShaderNodeMix")
         multiply2.data_type = "RGBA"
         multiply2.blend_type = "MULTIPLY"
-        links.new(output_color.outputs["Color"], multiply2.inputs["A"])
         multiply2.inputs["B"].default_value = (2.0, 2.0, 2.0, 1.0)
         multiply2.inputs["Factor"].default_value = 1.0
+
+        if "out_attr0.xyz" in shader.output_dependencies_xyz:
+            assign_index(
+                shader.output_dependencies_xyz["out_attr0.xyz"],
+                expr_outputs_xyz,
+                links,
+                multiply2.inputs["A"],
+            )
+        else:
+            output_color = nodes.new("ShaderNodeCombineColor")
+            for output, channel in [
+                ("out_attr0.x", "Red"),
+                ("out_attr0.y", "Green"),
+                ("out_attr0.z", "Blue"),
+            ]:
+                if output in shader.output_dependencies:
+                    assign_index(
+                        shader.output_dependencies[output],
+                        expr_outputs,
+                        links,
+                        output_color.inputs[channel],
+                    )
+
+            links.new(output_color.outputs["Color"], multiply2.inputs["A"])
 
         gamma = nodes.new("ShaderNodeGamma")
         links.new(multiply2.outputs["Result"], gamma.inputs["Color"])
@@ -421,6 +457,8 @@ def assign_output(
             return assign_index(i, expr_outputs, links, output)
 
         match func.op:
+            case sm4sh_model_py.database.Operation.Unk:
+                return None
             case sm4sh_model_py.database.Operation.Add:
                 return math_node("ADD")
             case sm4sh_model_py.database.Operation.Sub:
@@ -452,22 +490,24 @@ def assign_output(
                 return math_node("INVERSE_SQRT")
             case sm4sh_model_py.database.Operation.Fma:
                 return math_node("MULTIPLY_ADD")
-            case sm4sh_model_py.database.Operation.Dot:
+            case sm4sh_model_py.database.Operation.Dot3:
                 node = create_node_group(nodes, "Dot4", dot4_node_group)
                 node.name = func_name(func)
 
-                if len(func.args) == 6:
-                    # dot3
-                    assign_args(func, node, ["A.x", "A.y", "A.z", "B.x", "B.y", "B.z"])
-                    node.inputs["A.w"].default_value = 0.0
-                    node.inputs["B.w"].default_value = 0.0
-                else:
-                    # dot4
-                    assign_args(
-                        func,
-                        node,
-                        ["A.x", "A.y", "A.z", "A.w", "B.x", "B.y", "B.z", "B.w"],
-                    )
+                assign_args(func, node, ["A.x", "A.y", "A.z", "B.x", "B.y", "B.z"])
+                node.inputs["A.w"].default_value = 0.0
+                node.inputs["B.w"].default_value = 0.0
+
+                return node, "Value"
+            case sm4sh_model_py.database.Operation.Dot4:
+                node = create_node_group(nodes, "Dot4", dot4_node_group)
+                node.name = func_name(func)
+
+                assign_args(
+                    func,
+                    node,
+                    ["A.x", "A.y", "A.z", "A.w", "B.x", "B.y", "B.z", "B.w"],
+                )
 
                 return node, "Value"
             case sm4sh_model_py.database.Operation.Sin:
@@ -587,6 +627,7 @@ def assign_output(
             case sm4sh_model_py.database.Operation.VarianceShadow:
                 # Shadow mapping is already handled by Blender.
                 node = nodes.new("ShaderNodeValue")
+                node.label = "VarianceShadow"
                 node.outputs[0].default_value = 1.0
                 return node, "Value"
             case sm4sh_model_py.database.Operation.BlinnPhongSpecular:
@@ -648,8 +689,54 @@ def assign_output(
                     ],
                 )
                 return node, "Value"
-            case sm4sh_model_py.database.Operation.Unk:
-                return None
+            case sm4sh_model_py.database.Operation.TintColorX:
+                node = group_node(func, "TintColor", tint_color_node_group)
+                assign_args(
+                    func,
+                    node,
+                    ["Red", "Green", "Blue", "Factor"],
+                )
+                return node, "Red"
+            case sm4sh_model_py.database.Operation.TintColorY:
+                node = group_node(func, "TintColor", tint_color_node_group)
+                assign_args(
+                    func,
+                    node,
+                    ["Red", "Green", "Blue", "Factor"],
+                )
+                return node, "Green"
+            case sm4sh_model_py.database.Operation.TintColorZ:
+                node = group_node(func, "TintColor", tint_color_node_group)
+                assign_args(
+                    func,
+                    node,
+                    ["Red", "Green", "Blue", "Factor"],
+                )
+                return node, "Blue"
+            case sm4sh_model_py.database.Operation.NegReflectX:
+                node = group_node(func, "NegReflect", neg_reflect_node_group)
+                assign_args(
+                    func,
+                    node,
+                    ["A.x", "A.y", "A.z", "B.x", "B.y", "B.z"],
+                )
+                return node, "X"
+            case sm4sh_model_py.database.Operation.NegReflectY:
+                node = group_node(func, "NegReflect", neg_reflect_node_group)
+                assign_args(
+                    func,
+                    node,
+                    ["A.x", "A.y", "A.z", "B.x", "B.y", "B.z"],
+                )
+                return node, "Y"
+            case sm4sh_model_py.database.Operation.NegReflectZ:
+                node = group_node(func, "NegReflect", neg_reflect_node_group)
+                assign_args(
+                    func,
+                    node,
+                    ["A.x", "A.y", "A.z", "B.x", "B.y", "B.z"],
+                )
+                return node, "Z"
             case _:
                 # TODO: This case shouldn't happen?
                 return None
@@ -659,23 +746,303 @@ def assign_output(
         return None
 
 
+def assign_output_xyz(
+    shader: sm4sh_model_py.database.ShaderProgram,
+    expr: sm4sh_model_py.database.OutputExprXyz,
+    expr_outputs: list[Optional[Tuple[bpy.types.Node, str] | float]],
+    expr_outputs_xyz: list[
+        Optional[Tuple[bpy.types.Node, str] | tuple[float, float, float]]
+    ],
+    nodes,
+    links,
+    textures: Dict[str, Optional[bpy.types.Image]],
+) -> Optional[Tuple[bpy.types.Node, str] | tuple[float, float, float]]:
+    if func := expr.func():
+        return assign_func_xyz(func, expr_outputs_xyz, nodes, links)
+    elif value := expr.value():
+        return assign_value_xyz(shader, value, expr_outputs, nodes, links, textures)
+    else:
+        return None
+
+
 def assign_index(
     i: Optional[int],
-    expr_outputs: list[Optional[Tuple[bpy.types.Node, str] | float]],
+    expr_outputs: list[
+        Optional[Tuple[bpy.types.Node, str] | float | tuple[float, float, float]]
+    ],
     links,
     output,
 ):
     if i is not None:
-        if node_output := expr_outputs[i]:
-            if isinstance(node_output, float):
+        node_output = expr_outputs[i]
+        if node_output is not None:
+            try:
                 # Assign floats directly to reduce links and improve load times.
                 assign_float(output, node_output)
-            else:
+            except:
                 node, output_name = node_output
                 links.new(node.outputs[output_name], output)
         else:
-            # Set defaults to match xc3_wgpu and make debugging easier.
+            # Set defaults to match sm4sh_wgpu and make debugging easier.
             assign_float(output, 0.0)
+
+
+def assign_func_xyz(
+    func: sm4sh_model_py.database.OutputExprFuncXyz,
+    expr_outputs_xyz: list[
+        Optional[Tuple[bpy.types.Node, str] | tuple[float, float, float]]
+    ],
+    nodes,
+    links,
+) -> Optional[Tuple[bpy.types.Node, str] | tuple[float, float, float]]:
+    result = assign_func_xyz_inner(func, expr_outputs_xyz, nodes, links)
+    if result is not None:
+        node, output = result
+        return assign_xyz_channel(node, output, func.channel, nodes, links)
+    else:
+        return None
+
+
+def assign_func_xyz_inner(
+    func: sm4sh_model_py.database.OutputExprFuncXyz,
+    expr_outputs_xyz: list[
+        Optional[Tuple[bpy.types.Node, str] | tuple[float, float, float]]
+    ],
+    nodes,
+    links,
+) -> Optional[Tuple[bpy.types.Node, str]]:
+    # TODO: function that adds a separate XYZ node if needed.
+
+    def mix_rgba_node(ty):
+        return assign_mix_xyz(
+            func,
+            expr_outputs_xyz,
+            nodes,
+            links,
+            ty,
+        )
+
+    def math_node(ty):
+        return assign_math_xyz(
+            func,
+            expr_outputs_xyz,
+            nodes,
+            links,
+            ty,
+        )
+
+    def group_node(func, name, create_node_tree):
+        return create_cached_func_group_node(nodes, func, name, create_node_tree)
+
+    def assign_args(func, node, params):
+        return assign_func_args(func, params, expr_outputs_xyz, links, node)
+
+    def assign_arg(i, output):
+        return assign_index(i, expr_outputs_xyz, links, output)
+
+    match func.op:
+        case sm4sh_model_py.database.OperationXyz.Unk:
+            return None
+        case sm4sh_model_py.database.OperationXyz.Add:
+            return math_node("ADD")
+        case sm4sh_model_py.database.OperationXyz.Sub:
+            return math_node("SUBTRACT")
+        case sm4sh_model_py.database.OperationXyz.Mul:
+            return math_node("MULTIPLY")
+        case sm4sh_model_py.database.OperationXyz.Div:
+            return math_node("DIVIDE")
+        case sm4sh_model_py.database.OperationXyz.Mix:
+            return mix_rgba_node("MIX")
+        case sm4sh_model_py.database.OperationXyz.Clamp:
+            node = group_node(func, "ClampXyz", clamp_xyz_node_group)
+            assign_args(func, node, ["Vector", "Min", "Max"])
+            return node, "Vector"
+        case sm4sh_model_py.database.OperationXyz.Min:
+            return math_node("MINIMUM")
+        case sm4sh_model_py.database.OperationXyz.Max:
+            return math_node("MAXIMUM")
+        case sm4sh_model_py.database.OperationXyz.Abs:
+            return math_node("ABSOLUTE")
+        case sm4sh_model_py.database.OperationXyz.Floor:
+            return math_node("FLOOR")
+        case sm4sh_model_py.database.OperationXyz.Power:
+            return math_node("POWER")
+        case sm4sh_model_py.database.OperationXyz.Sqrt:
+            node = group_node(func, "SqrtXyz", sqrt_xyz_node_group)
+            assign_args(func, node, ["Value"])
+            return node, "Vector"
+        case sm4sh_model_py.database.OperationXyz.InverseSqrt:
+            node = group_node(func, "InverseSqrtXyz", inversesqrt_xyz_node_group)
+            assign_args(func, node, ["Value"])
+            return node, "Vector"
+        case sm4sh_model_py.database.OperationXyz.Fma:
+            return math_node("MULTIPLY_ADD")
+        case sm4sh_model_py.database.OperationXyz.Dot:
+            node = nodes.new("ShaderNodeVectorMath")
+            node.name = func_xyz_name(func)
+            node.operation = "DOT_PRODUCT"
+
+            assign_arg(func.args[0], node.inputs[0])
+            assign_arg(func.args[1], node.inputs[1])
+
+            return node, "Value"
+        case sm4sh_model_py.database.OperationXyz.Sin:
+            return math_node("SINE")
+        case sm4sh_model_py.database.OperationXyz.Cos:
+            return math_node("COSINE")
+        case sm4sh_model_py.database.OperationXyz.Exp2:
+            node = nodes.new("ShaderNodeVectorMath")
+            node.name = func_xyz_name(func)
+            node.operation = "POWER"
+
+            node.inputs[0].default_value = 2.0
+            assign_arg(func.args[0], node.inputs[1])
+
+            return node, "Vector"
+        case sm4sh_model_py.database.OperationXyz.Log2:
+            node = nodes.new("ShaderNodeVectorMath")
+            node.name = func_xyz_name(func)
+            node.operation = "LOGARITHM"
+
+            assign_arg(func.args[0], node.inputs[0])
+            node.inputs[1].default_value = 2.0
+
+            return node, "Vector"
+        case sm4sh_model_py.database.OperationXyz.Fract:
+            return math_node("FRACT")
+        # TODO: intbitstofloat, floatbitstoint
+
+        case sm4sh_model_py.database.OperationXyz.Select:
+            return mix_rgba_node("MIX")
+        case sm4sh_model_py.database.OperationXyz.Negate:
+            node = nodes.new("ShaderNodeVectorMath")
+            node.name = func_xyz_name(func)
+            node.operation = "MULTIPLY"
+
+            assign_arg(func.args[0], node.inputs[0])
+            node.inputs[1].default_value = (-1.0, -1.0, -1.0)
+
+            return node, "Vector"
+        case sm4sh_model_py.database.OperationXyz.Equal:
+            return math_node("COMPARE")
+        case sm4sh_model_py.database.OperationXyz.NotEqual:
+            # TODO: Invert compare.
+            return math_node("COMPARE")
+        case sm4sh_model_py.database.OperationXyz.Less:
+            node = group_node(func, "LessXyz", less_xyz_node_group)
+            assign_args(func, node, ["Value", "Threshold"])
+            return node, "Vector"
+        case sm4sh_model_py.database.OperationXyz.Greater:
+            node = group_node(func, "GreaterXyz", greater_xyz_node_group)
+            assign_args(func, node, ["Value", "Threshold"])
+            return node, "Vector"
+        case sm4sh_model_py.database.OperationXyz.LessEqual:
+            # TODO: node group for leq?
+            node = group_node(func, "LessXyz", less_xyz_node_group)
+            assign_args(func, node, ["Value", "Threshold"])
+            return node, "Vector"
+        case sm4sh_model_py.database.OperationXyz.GreaterEqual:
+            # TODO: node group for geq?
+            node = group_node(func, "GreaterXyz", greater_xyz_node_group)
+            assign_args(func, node, ["Value", "Threshold"])
+            return node, "Vector"
+        case sm4sh_model_py.database.OperationXyz.NormalMap:
+            node = group_node(func, "NormalMap", normal_map_node_group)
+            assign_args(func, node, ["Vector"])
+            return node, "Vector"
+        case sm4sh_model_py.database.OperationXyz.Normalize:
+            return math_node("NORMALIZE")
+        case sm4sh_model_py.database.OperationXyz.LocalToWorldPoint:
+            node = group_node(func, "LocalToWorldPoint", transform_point_node_group)
+            assign_args(func, node, ["X", "Y", "Z"])
+            return node, "Vector"
+        case sm4sh_model_py.database.OperationXyz.LocalToWorldVector:
+            node = group_node(func, "LocalToWorldVector", transform_vector_node_group)
+            assign_args(func, node, ["X", "Y", "Z"])
+            return node, "Vector"
+        case sm4sh_model_py.database.OperationXyz.VarianceShadow:
+            # Shadow mapping is already handled by Blender.
+            node = nodes.new("ShaderNodeValue")
+            node.outputs[0].default_value = 1.0
+            return node, "Value"
+        case sm4sh_model_py.database.OperationXyz.BlinnPhongSpecular:
+            node = group_node(
+                func, "BlinnPhongSpecularXyz", blinn_phong_spec_node_group_xyz
+            )
+            assign_args(
+                func,
+                node,
+                ["normal", "lightDir", "eye", "Exponent"],
+            )
+            return node, "Value"
+        case sm4sh_model_py.database.OperationXyz.AnisotropicSpecular:
+            node = group_node(
+                func, "AnisotropicSpecularXyz", anisotropic_spec_node_group_xyz
+            )
+            assign_args(
+                func,
+                node,
+                [
+                    "normal",
+                    "tangent",
+                    "eye",
+                    "ParamX",
+                    "ParamY",
+                ],
+            )
+            return node, "Value"
+        case sm4sh_model_py.database.OperationXyz.Fresnel:
+            node = group_node(func, "FresnelXyz", fresnel_node_group_xyz)
+            assign_args(
+                func,
+                node,
+                ["normal", "eye", "Param"],
+            )
+            return node, "Value"
+        case sm4sh_model_py.database.OperationXyz.TintColor:
+            node = group_node(func, "TintColorXyz", tint_color_node_group_xyz)
+            assign_args(
+                func,
+                node,
+                ["Color", "Factor"],
+            )
+            return node, "Color"
+        case sm4sh_model_py.database.OperationXyz.NegReflect:
+            node = group_node(func, "NegReflectXYZ", neg_reflect_node_group_xyz)
+            assign_args(
+                func,
+                node,
+                ["A", "B"],
+            )
+            return node, "Vector"
+        case _:
+            # TODO: This case shouldn't happen?
+            return None
+
+
+def assign_xyz_channel(
+    node,
+    output_name,
+    channel: Optional[sm4sh_model_py.database.ChannelXyz],
+    nodes,
+    links,
+) -> Tuple[bpy.types.Node, str]:
+    output = channel_xyz_name(channel)
+    if output == "Vector":
+        # Return the original output if all XYZ channels are used.
+        return node, output_name
+    elif output in node.outputs:
+        return node, output
+    else:
+        # Avoid creating more than one separate XYZ for each node.
+        xyz_name = f"{node.name}.xyz"
+        xyz_node = nodes.get(xyz_name)
+        if xyz_node is None:
+            xyz_node = nodes.new("ShaderNodeSeparateXYZ")
+            xyz_node.name = xyz_name
+            links.new(node.outputs[output_name], xyz_node.inputs["Vector"])
+
+        return xyz_node, output
 
 
 def assign_value(
@@ -703,12 +1070,19 @@ def assign_value(
         return None
 
 
-def assign_float(output, f):
-    # This may be a float, RGBA, or XYZ socket.
+def assign_float(output, f: float | tuple[float, float, float] | bpy.types.NodeSocket):
     try:
         output.default_value = [f] * len(output.default_value)
     except:
-        output.default_value = f
+        try:
+            output.default_value = f
+        except:
+            try:
+                # Assign XYZ to color socket.
+                output.default_value = (f[0], f[1], f[2], 1.0)
+            except:
+                # Assign XYZ to float socket.
+                output.default_value = f[0]
 
 
 def assign_parameter(
@@ -862,6 +1236,40 @@ def channel_name(channel: Optional[str]) -> str:
     return "X"
 
 
+def channel_xyz_name(channel: Optional[sm4sh_model_py.database.ChannelXyz]) -> str:
+    match channel:
+        case sm4sh_model_py.database.ChannelXyz.Xyz:
+            return "Vector"
+        case sm4sh_model_py.database.ChannelXyz.X:
+            return "X"
+        case sm4sh_model_py.database.ChannelXyz.Y:
+            return "Y"
+        case sm4sh_model_py.database.ChannelXyz.Z:
+            return "Z"
+        case sm4sh_model_py.database.ChannelXyz.W:
+            return "W"
+
+    # TODO: How to handle the None case?
+    return "Vector"
+
+
+def channel_xyz_rgba_name(channel: Optional[sm4sh_model_py.database.ChannelXyz]) -> str:
+    match channel:
+        case sm4sh_model_py.database.ChannelXyz.Xyz:
+            return "Color"
+        case sm4sh_model_py.database.ChannelXyz.X:
+            return "Red"
+        case sm4sh_model_py.database.ChannelXyz.Y:
+            return "Green"
+        case sm4sh_model_py.database.ChannelXyz.Z:
+            return "Blue"
+        case sm4sh_model_py.database.ChannelXyz.W:
+            return "Alpha"
+
+    # TODO: How to handle the None case?
+    return "Color"
+
+
 def assign_mix_rgba(
     func: sm4sh_model_py.database.OutputExprFunc,
     expr_outputs: list[Optional[Tuple[bpy.types.Node, str] | float]],
@@ -881,6 +1289,32 @@ def assign_mix_rgba(
     assign_index(func.args[1], expr_outputs, links, node.inputs["B"])
     if len(func.args) == 3:
         assign_index(func.args[2], expr_outputs, links, node.inputs["Factor"])
+
+    return node, "Result"
+
+
+def assign_mix_xyz(
+    func: sm4sh_model_py.database.OutputExprFuncXyz,
+    expr_outputs_xyz: list[
+        Optional[Tuple[bpy.types.Node, str] | tuple[float, float, float]]
+    ],
+    nodes,
+    links,
+    blend_type: str,
+) -> Tuple[bpy.types.Node, str]:
+    # TODO: Custom nodes with vector math to support negative values?
+    node = nodes.new("ShaderNodeMix")
+    node.data_type = "RGBA"
+    node.blend_type = blend_type
+    node.name = func_xyz_name(func)
+
+    if blend_type == "OVERLAY":
+        node.inputs["Factor"].default_value = 1.0
+
+    assign_index(func.args[0], expr_outputs_xyz, links, node.inputs["A"])
+    assign_index(func.args[1], expr_outputs_xyz, links, node.inputs["B"])
+    if len(func.args) == 3:
+        assign_index(func.args[2], expr_outputs_xyz, links, node.inputs["Factor"])
 
     return node, "Result"
 
@@ -973,11 +1407,16 @@ def assign_math(
 
 
 def func_name(func: sm4sh_model_py.database.OutputExprFunc):
-    return func_name_inner(func.op, func.args)
+    name = str(func.op).removeprefix("Operation.")
+    return func_name_inner(name, func.args, "")
 
 
-def func_name_inner(op: sm4sh_model_py.database.Operation, args: list[int]):
-    op_name = str(op).removeprefix("Operation.")
+def func_xyz_name(func: sm4sh_model_py.database.OutputExprFuncXyz):
+    name = str(func.op).removeprefix("OperationXyz.")
+    return func_name_inner(name, func.args, "xyz_")
+
+
+def func_name_inner(op_name: str, args: list[int], prefix: str):
     # Node groups that have multiple outputs can share a node.
     replacements = [
         ("NormalizeX", "Normalize"),
@@ -994,6 +1433,12 @@ def func_name_inner(op: sm4sh_model_py.database.Operation, args: list[int]):
         ("LocalToWorldVectorX", "LocalToWorldVector"),
         ("LocalToWorldVectorY", "LocalToWorldVector"),
         ("LocalToWorldVectorZ", "LocalToWorldVector"),
+        ("TintColorX", "TintColor"),
+        ("TintColorY", "TintColor"),
+        ("TintColorZ", "TintColor"),
+        ("NegReflectX", "NegReflect"),
+        ("NegReflectY", "NegReflect"),
+        ("NegReflectZ", "NegReflect"),
     ]
     for old, new in replacements:
         if op_name.startswith(old):
@@ -1001,7 +1446,7 @@ def func_name_inner(op: sm4sh_model_py.database.Operation, args: list[int]):
             break
 
     func_args = ", ".join(str(a) for a in args)
-    name = f"{op_name}({func_args})"
+    name = f"{prefix}{op_name}({func_args})"
     return name
 
 
@@ -1012,6 +1457,230 @@ def texture_assignment_name(texture):
 
 def float32_bits(f: float) -> int:
     return struct.unpack("@I", struct.pack("@f", f))[0]
+
+
+def assign_math_xyz(
+    func,
+    expr_outputs_xyz: list[
+        Optional[Tuple[bpy.types.Node, str] | tuple[float, float, float]]
+    ],
+    nodes,
+    links,
+    op: str,
+) -> Tuple[bpy.types.Node, str]:
+    node = nodes.new("ShaderNodeVectorMath")
+    node.operation = op
+    node.name = func_xyz_name(func)
+
+    for arg, input in zip(func.args, node.inputs):
+        assign_index(
+            arg,
+            expr_outputs_xyz,
+            links,
+            input,
+        )
+
+    return node, "Vector"
+
+
+def assign_value_xyz(
+    shader: sm4sh_model_py.database.ShaderProgram,
+    value: sm4sh_model_py.database.ValueXyz,
+    expr_outputs: list[Optional[Tuple[bpy.types.Node, str] | float]],
+    nodes,
+    links,
+    textures,
+) -> Optional[Tuple[bpy.types.Node, str] | tuple[float, float, float]]:
+    if floats := value.float():
+        # Don't create nodes or links for constants to improve loading times.
+        return floats
+    elif parameter := value.parameter():
+        return assign_parameter_xyz(shader, parameter, nodes, links)
+    elif attribute := value.attribute():
+        return assign_attribute_xyz(attribute, nodes, links)
+    elif texture := value.texture():
+        return assign_texture_xyz(texture, expr_outputs, nodes, links, textures)
+    else:
+        return None
+
+
+def assign_parameter_xyz(
+    shader: sm4sh_model_py.database.ShaderProgram,
+    parameter: sm4sh_model_py.database.ParameterXyz,
+    nodes,
+    links,
+) -> Optional[Tuple[bpy.types.Node, str]]:
+    if parameter.name == "MC" or parameter.name == "MC_EFFECT":
+        name = f"NU_{parameter.field}"
+        if node := nodes.get(name):
+            # NU_ nodes use a custom node group for RGBA channel support.
+            return node, channel_xyz_rgba_name(parameter.channel)
+        # TODO: create node for missing NU_ parameters with default values?
+    else:
+        node = nodes.new("ShaderNodeCombineXYZ")
+        node.label = parameter_label_xyz(parameter)
+
+        # Assign the vector by treating the access as 3 scalar parameters.
+        channels = [None, None, None]
+        if parameter.channel is not None:
+            match parameter.channel:
+                case sm4sh_model_py.database.ChannelXyz.Xyz:
+                    channels = ["x", "y", "z"]
+                case sm4sh_model_py.database.ChannelXyz.X:
+                    channels = ["x", "x", "x"]
+                case sm4sh_model_py.database.ChannelXyz.Y:
+                    channels = ["y", "y", "y"]
+                case sm4sh_model_py.database.ChannelXyz.Z:
+                    channels = ["z", "z", "z"]
+                case sm4sh_model_py.database.ChannelXyz.W:
+                    channels = ["w", "w", "w"]
+
+        for channel, component in zip(channels, "XYZ"):
+            f = shader.parameter_value(
+                sm4sh_model_py.database.Parameter(
+                    parameter.name, parameter.field, parameter.index, channel
+                )
+            )
+            if f is not None:
+                node.inputs[component].default_value = f
+
+        return node, "Vector"
+
+
+def parameter_label_xyz(p: sm4sh_model_py.database.ParameterXyz) -> str:
+    name = f"{p.name}.{p.field}"
+
+    if p.index is not None:
+        name += f"[{p.index}]"
+
+    if p.channel is not None:
+        match p.channel:
+            case sm4sh_model_py.database.ChannelXyz.Xyz:
+                name += ".xyz"
+            case sm4sh_model_py.database.ChannelXyz.X:
+                name += ".xxx"
+            case sm4sh_model_py.database.ChannelXyz.Y:
+                name += ".yyy"
+            case sm4sh_model_py.database.ChannelXyz.Z:
+                name += ".zzz"
+            case sm4sh_model_py.database.ChannelXyz.W:
+                name += ".www"
+
+    return name
+
+
+def assign_attribute_xyz(
+    attribute: sm4sh_model_py.database.AttributeXyz, nodes, links
+) -> Optional[Tuple[bpy.types.Node, str]]:
+    name = attribute.name
+    channel = attribute.channel
+
+    # Some attributes aren't exposed directly and require custom node groups.
+    match name:
+        case "a_Position":
+            return assign_attribute_node_xyz(nodes, links, name, channel, "position")
+        case "a_Normal":
+            node = nodes.get(name)
+            if node is None:
+                node = create_node_group(
+                    nodes, "GeometryNormal", geometry_normal_node_group
+                )
+                node.name = name
+
+            return node, channel_xyz_name(channel)
+        case "a_Tangent":
+            node = nodes.get(name)
+            if node is None:
+                node = create_node_group(
+                    nodes, "GeometryTangent", geometry_tangent_node_group
+                )
+                node.name = name
+
+            return node, channel_xyz_name(channel)
+        case "a_Binormal":
+            node = nodes.get(name)
+            if node is None:
+                node = create_node_group(
+                    nodes, "GeometryBitangent", geometry_bitangent_node_group
+                )
+                node.name = name
+
+            return node, channel_xyz_name(channel)
+        case "a_Color":
+            return assign_attribute_node_xyz(nodes, links, name, channel, "Color")
+        case "a_TexCoord0":
+            return assign_attribute_node_xyz(nodes, links, name, channel, "UV0")
+        case "a_TexCoord1":
+            return assign_attribute_node_xyz(nodes, links, name, channel, "UV1")
+        case "a_TexCoord2":
+            return assign_attribute_node_xyz(nodes, links, name, channel, "UV2")
+        case "eye":
+            node = nodes.get(name)
+            if node is None:
+                node = create_node_group(nodes, "EyeVector", eye_vector_node_group)
+                node.name = name
+
+            return node, channel_xyz_name(channel)
+        case "bitangent_sign":
+            # TODO: Is there a way to calculate this?
+            return None
+
+
+def assign_attribute_node_xyz(
+    nodes,
+    links,
+    name: str,
+    channel: Optional[sm4sh_model_py.database.ChannelXyz],
+    attribute_name: str,
+) -> Tuple[bpy.types.Node, str]:
+    node = nodes.get(name)
+    if node is None:
+        node = nodes.new("ShaderNodeAttribute")
+        node.name = name
+        node.attribute_name = attribute_name
+
+    return assign_color_channel_xyz(name, channel, node, nodes, links)
+
+
+def assign_texture_xyz(
+    texture: sm4sh_model_py.database.TextureXyz,
+    expr_outputs: list[Optional[Tuple[bpy.types.Node, str] | float]],
+    nodes,
+    links,
+    textures: Dict[str, bpy.types.Image],
+) -> Optional[Tuple[bpy.types.Node, str]]:
+    name = texture_assignment_name(texture)
+
+    # Don't use the above name for node caching for any of the texture nodes.
+    # This ensures the correct channel is assigned for each assignment.
+    node = textures.get(texture.name)
+    if node is not None:
+        assign_uvs(texture.texcoords, expr_outputs, node, nodes, links)
+        return assign_color_channel_xyz(name, texture.channel, node, nodes, links)
+    else:
+        return None
+
+
+def assign_color_channel_xyz(
+    name: str,
+    channel: Optional[sm4sh_model_py.database.ChannelXyz],
+    node,
+    nodes,
+    links,
+) -> Tuple[bpy.types.Node, str]:
+    match channel:
+        case sm4sh_model_py.database.ChannelXyz.Xyz:
+            return node, "Color"
+        case sm4sh_model_py.database.ChannelXyz.X:
+            return assign_channel(name, "x", node, nodes, links)
+        case sm4sh_model_py.database.ChannelXyz.Y:
+            return assign_channel(name, "y", node, nodes, links)
+        case sm4sh_model_py.database.ChannelXyz.Z:
+            return assign_channel(name, "z", node, nodes, links)
+        case sm4sh_model_py.database.ChannelXyz.W:
+            return assign_channel(name, "w", node, nodes, links)
+        case _:
+            return node, "Color"
 
 
 def create_cached_func_group_node(
@@ -1038,3 +1707,79 @@ def assign_func_args(
 ):
     for i, param in zip(func.args, params):
         assign_index(i, assignment_outputs, links, node.inputs[param])
+
+
+def used_assignments(
+    shader: sm4sh_model_py.database.ShaderProgram,
+) -> Tuple[Set[int], Set[int]]:
+    visited = set()
+    visited_xyz = set()
+
+    exprs = shader.exprs
+    exprs_xyz = shader.exprs_xyz
+
+    if "out_attr0.xyz" in shader.output_dependencies_xyz:
+        add_used_xyz_assignments(
+            visited,
+            visited_xyz,
+            exprs,
+            exprs_xyz,
+            shader.output_dependencies_xyz["out_attr0.xyz"],
+        )
+    else:
+        for c in "xyz":
+            if f"out_attr0.{c}" in shader.output_dependencies:
+                add_used_assignments(
+                    visited, exprs, shader.output_dependencies[f"out_attr0.{c}"]
+                )
+
+    if "out_attr0.w" in shader.output_dependencies:
+        add_used_assignments(visited, exprs, shader.output_dependencies["out_attr0.w"])
+
+    return visited, visited_xyz
+
+
+def add_used_assignments(
+    visited: Set[int],
+    assignments: list[sm4sh_model_py.database.OutputExpr],
+    i: Optional[int],
+):
+    if i is not None:
+        if i not in visited:
+            visited.add(i)
+
+            assignment = assignments[i]
+            if func := assignment.func():
+                # Skip shadow map rendering for now.
+                if func.op != sm4sh_model_py.database.Operation.VarianceShadow:
+                    for arg in func.args:
+                        add_used_assignments(visited, assignments, arg)
+            elif value := assignment.value():
+                if texture := value.texture():
+                    for coord in texture.texcoords:
+                        add_used_assignments(visited, assignments, coord)
+
+
+def add_used_xyz_assignments(
+    visited: Set[int],
+    visited_xyz: Set[int],
+    exprs: list[sm4sh_model_py.database.OutputExpr],
+    exprs_xyz: list[sm4sh_model_py.database.OutputExprXyz],
+    i: int,
+):
+    if i not in visited_xyz:
+        visited_xyz.add(i)
+
+        assignment = exprs_xyz[i]
+        if func := assignment.func():
+            # Skip shadow map rendering for now.
+            if func.op != sm4sh_model_py.database.OperationXyz.VarianceShadow:
+                for arg in func.args:
+                    add_used_xyz_assignments(
+                        visited, visited_xyz, exprs, exprs_xyz, arg
+                    )
+        elif value := assignment.value():
+            # Collect the scalar assignments for texture coordinates.
+            if texture := value.texture():
+                for coord in texture.texcoords:
+                    add_used_assignments(visited, exprs, coord)
