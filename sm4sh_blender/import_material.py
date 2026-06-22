@@ -148,7 +148,7 @@ def create_material_basic(
             case sm4sh_model_py.WrapMode.MirroredRepeat:
                 node.extension = "MIRROR"
             case sm4sh_model_py.WrapMode.ClampToEdge:
-                node.extension = "CLIP"
+                node.extension = "EXTEND"
 
         texture_nodes.append(node)
 
@@ -338,7 +338,7 @@ def update_material(
                 case sm4sh_model_py.WrapMode.MirroredRepeat:
                     node.extension = "MIRROR"
                 case sm4sh_model_py.WrapMode.ClampToEdge:
-                    node.extension = "CLIP"
+                    node.extension = "EXTEND"
 
 
 def update_custom_properties(

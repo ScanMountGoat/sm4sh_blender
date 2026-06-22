@@ -154,7 +154,7 @@ def export_material(
                         case "REPEAT":
                             wrap_s = sm4sh_model_py.WrapMode.Repeat
                             wrap_t = sm4sh_model_py.WrapMode.Repeat
-                        case "CLIP":
+                        case "EXTEND":
                             wrap_s = sm4sh_model_py.WrapMode.ClampToEdge
                             wrap_t = sm4sh_model_py.WrapMode.ClampToEdge
                         case "MIRROR":
