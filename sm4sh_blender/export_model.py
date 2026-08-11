@@ -1,6 +1,5 @@
 import math
 import typing
-from typing import Optional, Tuple
 
 import bmesh
 import bpy
@@ -222,7 +221,7 @@ def export_mesh(
     bone_names: list[str],
     database: sm4sh_model_py.database.ShaderDatabase,
     image_args: dict[int, sm4sh_model_py.EncodeSurfaceRgba32FloatArgs],
-) -> Tuple[sm4sh_model_py.NudMesh, Optional[int]]:
+) -> tuple[sm4sh_model_py.NudMesh, int | None]:
     # Work on a copy in case we need to make any changes.
     mesh_copy = blender_mesh.copy()
     mesh_copy.data = blender_mesh.data.copy()
@@ -244,7 +243,7 @@ def export_mesh_inner(
     bone_names: list[str],
     database: sm4sh_model_py.database.ShaderDatabase,
     image_args: dict[int, sm4sh_model_py.EncodeSurfaceRgba32FloatArgs],
-) -> Tuple[sm4sh_model_py.NudMesh, Optional[int]]:
+) -> tuple[sm4sh_model_py.NudMesh, int | None]:
 
     mesh_data: bpy.types.Mesh = blender_mesh.data
 

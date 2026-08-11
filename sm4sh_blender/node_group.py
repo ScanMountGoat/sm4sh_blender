@@ -1,5 +1,3 @@
-from typing import Tuple
-
 import bpy
 
 from sm4sh_blender.node_layout import layout_nodes
@@ -429,7 +427,7 @@ def geometry_normal_node_group(name: str):
     return geometry_tbn_node_group_inner(name, (0.0, 0.0, 1.0, 1.0))
 
 
-def geometry_tbn_node_group_inner(name: str, rgba: Tuple[float, float, float, float]):
+def geometry_tbn_node_group_inner(name: str, rgba: tuple[float, float, float, float]):
     node_tree = bpy.data.node_groups.new(name, "ShaderNodeTree")
 
     node_tree.interface.new_socket(

@@ -1,5 +1,4 @@
 import typing
-from typing import Optional
 
 import bpy
 import numpy as np
@@ -278,7 +277,7 @@ def default_material() -> sm4sh_model_py.NudMaterial:
 
 def metal_material(
     material: sm4sh_model_py.NudMaterial,
-    blender_material: Optional[bpy.types.Material],
+    blender_material: bpy.types.Material | None,
     database: sm4sh_model_py.database.ShaderDatabase,
     image_args: dict[int, sm4sh_model_py.EncodeSurfaceRgba32FloatArgs],
 ) -> sm4sh_model_py.NudMaterial:

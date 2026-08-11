@@ -1,6 +1,5 @@
 import struct
 import typing
-from typing import Dict, Optional, Set, Tuple
 
 import bpy
 
@@ -45,7 +44,7 @@ else:
 
 def import_material(
     material: sm4sh_model_py.NudMaterial,
-    metal_material: Optional[sm4sh_model_py.NudMaterial],
+    metal_material: sm4sh_model_py.NudMaterial | None,
     database: sm4sh_model_py.database.ShaderDatabase,
     use_advanced_nodes: bool,
 ) -> bpy.types.Material:
@@ -85,7 +84,7 @@ def import_material(
 
 def create_material_basic(
     material: sm4sh_model_py.NudMaterial,
-    shader: Optional[sm4sh_model_py.database.ShaderProgram],
+    shader: sm4sh_model_py.database.ShaderProgram | None,
 ) -> bpy.types.Material:
     name = f"{material.shader_id:08X}"
     blender_material = bpy.data.materials.new(name)
@@ -175,7 +174,7 @@ def create_material_basic(
 
 def create_material(
     material: sm4sh_model_py.NudMaterial,
-    shader: Optional[sm4sh_model_py.database.ShaderProgram],
+    shader: sm4sh_model_py.database.ShaderProgram | None,
 ) -> bpy.types.Material:
     name = f"{material.shader_id:08X}"
     blender_material = bpy.data.materials.new(name)
@@ -360,8 +359,8 @@ def update_custom_properties(
 
 def update_metal_custom_properties(
     blender_material: bpy.types.Material,
-    metal_material: Optional[sm4sh_model_py.NudMaterial],
-    metal_shader: Optional[sm4sh_model_py.database.ShaderProgram],
+    metal_material: sm4sh_model_py.NudMaterial | None,
+    metal_shader: sm4sh_model_py.database.ShaderProgram | None,
 ):
     if metal_material is not None:
         # Texture usage is determined by the compiled shaders.
@@ -422,11 +421,11 @@ def material_images_samplers(material, blender_images, samplers):
 def assign_output(
     shader: sm4sh_model_py.database.ShaderProgram,
     expr: sm4sh_model_py.database.OutputExpr,
-    expr_outputs: list[Optional[Tuple[bpy.types.Node, str] | float]],
+    expr_outputs: list[tuple[bpy.types.Node, str] | float | None],
     nodes,
     links,
-    textures: Dict[str, Optional[bpy.types.Image]],
-) -> Optional[Tuple[bpy.types.Node, str] | float]:
+    textures: dict[str, bpy.types.Image | None],
+) -> tuple[bpy.types.Node, str] | float | None:
     if func := expr.func():
 
         def mix_rgba_node(ty):
@@ -749,14 +748,14 @@ def assign_output(
 def assign_output_xyz(
     shader: sm4sh_model_py.database.ShaderProgram,
     expr: sm4sh_model_py.database.OutputExprXyz,
-    expr_outputs: list[Optional[Tuple[bpy.types.Node, str] | float]],
+    expr_outputs: list[tuple[bpy.types.Node, str] | float | None],
     expr_outputs_xyz: list[
-        Optional[Tuple[bpy.types.Node, str] | tuple[float, float, float]]
+        tuple[bpy.types.Node, str] | tuple[float, float, float] | None
     ],
     nodes,
     links,
-    textures: Dict[str, Optional[bpy.types.Image]],
-) -> Optional[Tuple[bpy.types.Node, str] | tuple[float, float, float]]:
+    textures: dict[str, bpy.types.Image | None],
+) -> tuple[bpy.types.Node, str] | tuple[float, float, float] | None:
     if func := expr.func():
         return assign_func_xyz(func, expr_outputs_xyz, nodes, links)
     elif value := expr.value():
@@ -766,9 +765,9 @@ def assign_output_xyz(
 
 
 def assign_index(
-    i: Optional[int],
+    i: int | None,
     expr_outputs: list[
-        Optional[Tuple[bpy.types.Node, str] | float | tuple[float, float, float]]
+        tuple[bpy.types.Node, str] | float | tuple[float, float, float] | None
     ],
     links,
     output,
@@ -790,11 +789,11 @@ def assign_index(
 def assign_func_xyz(
     func: sm4sh_model_py.database.OutputExprFuncXyz,
     expr_outputs_xyz: list[
-        Optional[Tuple[bpy.types.Node, str] | tuple[float, float, float]]
+        tuple[bpy.types.Node, str] | tuple[float, float, float] | None
     ],
     nodes,
     links,
-) -> Optional[Tuple[bpy.types.Node, str] | tuple[float, float, float]]:
+) -> tuple[bpy.types.Node, str] | tuple[float, float, float] | None:
     result = assign_func_xyz_inner(func, expr_outputs_xyz, nodes, links)
     if result is not None:
         node, output = result
@@ -806,11 +805,11 @@ def assign_func_xyz(
 def assign_func_xyz_inner(
     func: sm4sh_model_py.database.OutputExprFuncXyz,
     expr_outputs_xyz: list[
-        Optional[Tuple[bpy.types.Node, str] | tuple[float, float, float]]
+        tuple[bpy.types.Node, str] | tuple[float, float, float] | None
     ],
     nodes,
     links,
-) -> Optional[Tuple[bpy.types.Node, str]]:
+) -> tuple[bpy.types.Node, str] | None:
     # TODO: function that adds a separate XYZ node if needed.
 
     def mix_rgba_node(ty):
@@ -1023,10 +1022,10 @@ def assign_func_xyz_inner(
 def assign_xyz_channel(
     node,
     output_name,
-    channel: Optional[sm4sh_model_py.database.ChannelXyz],
+    channel: sm4sh_model_py.database.ChannelXyz | None,
     nodes,
     links,
-) -> Tuple[bpy.types.Node, str]:
+) -> tuple[bpy.types.Node, str]:
     output = channel_xyz_name(channel)
     if output == "Vector":
         # Return the original output if all XYZ channels are used.
@@ -1048,11 +1047,11 @@ def assign_xyz_channel(
 def assign_value(
     shader: sm4sh_model_py.database.ShaderProgram,
     value: sm4sh_model_py.database.Value,
-    expr_outputs: list[Optional[Tuple[bpy.types.Node, str] | float]],
+    expr_outputs: list[tuple[bpy.types.Node, str] | float | None],
     nodes,
     links,
     textures,
-) -> Optional[Tuple[bpy.types.Node, str] | float]:
+) -> tuple[bpy.types.Node, str] | float | None:
     if i := value.int():
         node = nodes.new("ShaderNodeValue")
         node.outputs[0].default_value = i
@@ -1090,7 +1089,7 @@ def assign_parameter(
     parameter: sm4sh_model_py.database.Parameter,
     nodes,
     links,
-) -> Optional[Tuple[bpy.types.Node, str]]:
+) -> tuple[bpy.types.Node, str] | None:
     # TODO: Is there an easy way to support all the global parameters?
     if parameter.name == "MC" or parameter.name == "MC_EFFECT":
         name = f"NU_{parameter.field}"
@@ -1120,7 +1119,7 @@ def assign_parameter(
 
 def assign_attribute(
     attribute: sm4sh_model_py.database.Attribute, nodes, links
-) -> Optional[Tuple[bpy.types.Node, str]]:
+) -> tuple[bpy.types.Node, str] | None:
     name = attribute.name
     channel = attribute.channel
 
@@ -1176,8 +1175,8 @@ def assign_attribute(
 
 
 def assign_attribute_node(
-    nodes, links, name: str, channel: Optional[str], attribute_name: str
-) -> Tuple[bpy.types.Node, str]:
+    nodes, links, name: str, channel: str | None, attribute_name: str
+) -> tuple[bpy.types.Node, str]:
     node = nodes.get(name)
     if node is None:
         node = nodes.new("ShaderNodeAttribute")
@@ -1188,8 +1187,8 @@ def assign_attribute_node(
 
 
 def assign_channel(
-    name: str, channel: Optional[str], node, nodes, links
-) -> Tuple[bpy.types.Node, str]:
+    name: str, channel: str | None, node, nodes, links
+) -> tuple[bpy.types.Node, str]:
     output = channel_rgba_name(channel)
     if output == "Alpha":
         # Alpha isn't part of the RGB node.
@@ -1206,7 +1205,7 @@ def assign_channel(
         return rgb_node, output
 
 
-def channel_rgba_name(channel: Optional[str]) -> str:
+def channel_rgba_name(channel: str | None) -> str:
     match channel:
         case "x":
             return "Red"
@@ -1221,7 +1220,7 @@ def channel_rgba_name(channel: Optional[str]) -> str:
     return "Red"
 
 
-def channel_name(channel: Optional[str]) -> str:
+def channel_name(channel: str | None) -> str:
     match channel:
         case "x":
             return "X"
@@ -1236,7 +1235,7 @@ def channel_name(channel: Optional[str]) -> str:
     return "X"
 
 
-def channel_xyz_name(channel: Optional[sm4sh_model_py.database.ChannelXyz]) -> str:
+def channel_xyz_name(channel: sm4sh_model_py.database.ChannelXyz | None) -> str:
     match channel:
         case sm4sh_model_py.database.ChannelXyz.Xyz:
             return "Vector"
@@ -1253,7 +1252,7 @@ def channel_xyz_name(channel: Optional[sm4sh_model_py.database.ChannelXyz]) -> s
     return "Vector"
 
 
-def channel_xyz_rgba_name(channel: Optional[sm4sh_model_py.database.ChannelXyz]) -> str:
+def channel_xyz_rgba_name(channel: sm4sh_model_py.database.ChannelXyz | None) -> str:
     match channel:
         case sm4sh_model_py.database.ChannelXyz.Xyz:
             return "Color"
@@ -1272,11 +1271,11 @@ def channel_xyz_rgba_name(channel: Optional[sm4sh_model_py.database.ChannelXyz])
 
 def assign_mix_rgba(
     func: sm4sh_model_py.database.OutputExprFunc,
-    expr_outputs: list[Optional[Tuple[bpy.types.Node, str] | float]],
+    expr_outputs: list[tuple[bpy.types.Node, str] | float | None],
     nodes,
     links,
     blend_type: str,
-) -> Tuple[bpy.types.Node, str]:
+) -> tuple[bpy.types.Node, str]:
     node = nodes.new("ShaderNodeMix")
     node.data_type = "RGBA"
     node.blend_type = blend_type
@@ -1296,12 +1295,12 @@ def assign_mix_rgba(
 def assign_mix_xyz(
     func: sm4sh_model_py.database.OutputExprFuncXyz,
     expr_outputs_xyz: list[
-        Optional[Tuple[bpy.types.Node, str] | tuple[float, float, float]]
+        tuple[bpy.types.Node, str] | tuple[float, float, float] | None
     ],
     nodes,
     links,
     blend_type: str,
-) -> Tuple[bpy.types.Node, str]:
+) -> tuple[bpy.types.Node, str]:
     # TODO: Custom nodes with vector math to support negative values?
     node = nodes.new("ShaderNodeMix")
     node.data_type = "RGBA"
@@ -1321,11 +1320,11 @@ def assign_mix_xyz(
 
 def assign_texture(
     texture: sm4sh_model_py.database.Texture,
-    expr_outputs: list[Optional[Tuple[bpy.types.Node, str] | float]],
+    expr_outputs: list[tuple[bpy.types.Node, str] | float | None],
     nodes,
     links,
-    textures: Dict[str, bpy.types.Image],
-) -> Optional[Tuple[bpy.types.Node, str]]:
+    textures: dict[str, bpy.types.Image],
+) -> tuple[bpy.types.Node, str] | None:
     name = texture_assignment_name(texture)
 
     # Don't use the above name for node caching for any of the texture nodes.
@@ -1391,11 +1390,11 @@ def assign_uvs(texcoords: list[int], expr_outputs, node, nodes, links):
 
 def assign_math(
     func: sm4sh_model_py.database.OutputExprFunc,
-    expr_outputs: list[Optional[Tuple[bpy.types.Node, str] | float]],
+    expr_outputs: list[tuple[bpy.types.Node, str] | float | None],
     nodes,
     links,
     op: str,
-) -> Tuple[bpy.types.Node, str]:
+) -> tuple[bpy.types.Node, str]:
     node = nodes.new("ShaderNodeMath")
     node.operation = op
     node.name = func_name(func)
@@ -1462,12 +1461,12 @@ def float32_bits(f: float) -> int:
 def assign_math_xyz(
     func,
     expr_outputs_xyz: list[
-        Optional[Tuple[bpy.types.Node, str] | tuple[float, float, float]]
+        tuple[bpy.types.Node, str] | tuple[float, float, float] | None
     ],
     nodes,
     links,
     op: str,
-) -> Tuple[bpy.types.Node, str]:
+) -> tuple[bpy.types.Node, str]:
     node = nodes.new("ShaderNodeVectorMath")
     node.operation = op
     node.name = func_xyz_name(func)
@@ -1486,11 +1485,11 @@ def assign_math_xyz(
 def assign_value_xyz(
     shader: sm4sh_model_py.database.ShaderProgram,
     value: sm4sh_model_py.database.ValueXyz,
-    expr_outputs: list[Optional[Tuple[bpy.types.Node, str] | float]],
+    expr_outputs: list[tuple[bpy.types.Node, str] | float | None],
     nodes,
     links,
     textures,
-) -> Optional[Tuple[bpy.types.Node, str] | tuple[float, float, float]]:
+) -> tuple[bpy.types.Node, str] | tuple[float, float, float] | None:
     if floats := value.float():
         # Don't create nodes or links for constants to improve loading times.
         return floats
@@ -1509,7 +1508,7 @@ def assign_parameter_xyz(
     parameter: sm4sh_model_py.database.ParameterXyz,
     nodes,
     links,
-) -> Optional[Tuple[bpy.types.Node, str]]:
+) -> tuple[bpy.types.Node, str] | None:
     if parameter.name == "MC" or parameter.name == "MC_EFFECT":
         name = f"NU_{parameter.field}"
         if node := nodes.get(name):
@@ -1571,7 +1570,7 @@ def parameter_label_xyz(p: sm4sh_model_py.database.ParameterXyz) -> str:
 
 def assign_attribute_xyz(
     attribute: sm4sh_model_py.database.AttributeXyz, nodes, links
-) -> Optional[Tuple[bpy.types.Node, str]]:
+) -> tuple[bpy.types.Node, str] | None:
     name = attribute.name
     channel = attribute.channel
 
@@ -1630,9 +1629,9 @@ def assign_attribute_node_xyz(
     nodes,
     links,
     name: str,
-    channel: Optional[sm4sh_model_py.database.ChannelXyz],
+    channel: sm4sh_model_py.database.ChannelXyz | None,
     attribute_name: str,
-) -> Tuple[bpy.types.Node, str]:
+) -> tuple[bpy.types.Node, str]:
     node = nodes.get(name)
     if node is None:
         node = nodes.new("ShaderNodeAttribute")
@@ -1644,11 +1643,11 @@ def assign_attribute_node_xyz(
 
 def assign_texture_xyz(
     texture: sm4sh_model_py.database.TextureXyz,
-    expr_outputs: list[Optional[Tuple[bpy.types.Node, str] | float]],
+    expr_outputs: list[tuple[bpy.types.Node, str] | float | None],
     nodes,
     links,
-    textures: Dict[str, bpy.types.Image],
-) -> Optional[Tuple[bpy.types.Node, str]]:
+    textures: dict[str, bpy.types.Image],
+) -> tuple[bpy.types.Node, str] | None:
     name = texture_assignment_name(texture)
 
     # Don't use the above name for node caching for any of the texture nodes.
@@ -1663,11 +1662,11 @@ def assign_texture_xyz(
 
 def assign_color_channel_xyz(
     name: str,
-    channel: Optional[sm4sh_model_py.database.ChannelXyz],
+    channel: sm4sh_model_py.database.ChannelXyz | None,
     node,
     nodes,
     links,
-) -> Tuple[bpy.types.Node, str]:
+) -> tuple[bpy.types.Node, str]:
     match channel:
         case sm4sh_model_py.database.ChannelXyz.Xyz:
             return node, "Color"
@@ -1701,7 +1700,7 @@ def create_cached_func_group_node(
 def assign_func_args(
     func: sm4sh_model_py.database.OutputExprFunc,
     params: list[int | str],
-    assignment_outputs: list[Optional[Tuple[bpy.types.Node, str] | float]],
+    assignment_outputs: list[tuple[bpy.types.Node, str] | float | None],
     links,
     node: bpy.types.Node,
 ):
@@ -1711,7 +1710,7 @@ def assign_func_args(
 
 def used_assignments(
     shader: sm4sh_model_py.database.ShaderProgram,
-) -> Tuple[Set[int], Set[int]]:
+) -> tuple[set[int], set[int]]:
     visited = set()
     visited_xyz = set()
 
@@ -1740,9 +1739,9 @@ def used_assignments(
 
 
 def add_used_assignments(
-    visited: Set[int],
+    visited: set[int],
     assignments: list[sm4sh_model_py.database.OutputExpr],
-    i: Optional[int],
+    i: int | None,
 ):
     if i is not None:
         if i not in visited:
@@ -1761,8 +1760,8 @@ def add_used_assignments(
 
 
 def add_used_xyz_assignments(
-    visited: Set[int],
-    visited_xyz: Set[int],
+    visited: set[int],
+    visited_xyz: set[int],
     exprs: list[sm4sh_model_py.database.OutputExpr],
     exprs_xyz: list[sm4sh_model_py.database.OutputExprXyz],
     i: int,

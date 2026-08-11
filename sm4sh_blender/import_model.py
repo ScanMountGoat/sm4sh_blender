@@ -1,7 +1,6 @@
 import logging
 import math
 import typing
-from typing import Optional
 
 import bpy
 import numpy as np
@@ -29,10 +28,10 @@ def import_nud_model(
     operator,
     context,
     model: sm4sh_model_py.NudModel,
-    metal_model: Optional[sm4sh_model_py.NudModel],
+    metal_model: sm4sh_model_py.NudModel | None,
     database: sm4sh_model_py.database.ShaderDatabase,
     use_advanced_nodes: bool,
-) -> Optional[bpy.types.Object]:
+) -> bpy.types.Object | None:
     # These images will be referenced later by name.
     # TODO: Check for duplicates?
     pngs = sm4sh_model_py.decode_images_png(model.textures)
@@ -85,9 +84,9 @@ def import_mesh(
     collection: bpy.types.Collection,
     group: sm4sh_model_py.NudMeshGroup,
     mesh: sm4sh_model_py.NudMesh,
-    metal_mesh: Optional[sm4sh_model_py.NudMesh],
+    metal_mesh: sm4sh_model_py.NudMesh | None,
     mesh_index: int,
-    armature: Optional[bpy.types.Object],
+    armature: bpy.types.Object | None,
     bone_names: list[str],
     database: sm4sh_model_py.database.ShaderDatabase,
     use_advanced_nodes: bool,

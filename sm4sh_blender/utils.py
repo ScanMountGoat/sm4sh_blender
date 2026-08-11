@@ -1,5 +1,4 @@
 import struct
-from typing import Optional
 
 
 def get_enum_value(obj, name: str, enum, default=None):
@@ -14,7 +13,7 @@ def float32_from_bits(bits: int) -> float:
     return struct.unpack("@f", struct.pack("@I", bits))[0]
 
 
-def parse_int(name: str, base=10) -> Optional[int]:
+def parse_int(name: str, base=10) -> int | None:
     value = None
     try:
         value = int(name, base)
