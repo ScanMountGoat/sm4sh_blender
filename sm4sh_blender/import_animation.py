@@ -14,16 +14,16 @@ else:
     from . import sm4sh_model_py
 
 
-class ImportPac(bpy.types.Operator, ImportHelper):
+class ImportOmo(bpy.types.Operator, ImportHelper):
     """Import a Smash 4 animation"""
 
-    bl_idname = "import_scene.pac"
-    bl_label = "Import Pac"
+    bl_idname = "import_scene.omo"
+    bl_label = "Import Omo"
 
-    filename_ext = ".mot"
+    filename_ext = ".omo"
 
     filter_glob: StringProperty(
-        default="*.pac",
+        default="*.omo;*.pac",
         options={"HIDDEN"},
         maxlen=255,
     )

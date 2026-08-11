@@ -9,8 +9,8 @@ def menu_import_nud(self, context):
 
 
 def menu_import_pac(self, context):
-    text = "Smash 4 Animation (.pac)"
-    self.layout.operator(import_animation.ImportPac.bl_idname, text=text)
+    text = "Smash 4 Animation (.omo/.pac)"
+    self.layout.operator(import_animation.ImportOmo.bl_idname, text=text)
 
 
 def menu_export_nud(self, context):
@@ -136,7 +136,7 @@ class MaterialProperties(bpy.types.PropertyGroup):
 # The order here matters.
 classes = [
     import_nud.ImportNud,
-    import_animation.ImportPac,
+    import_animation.ImportOmo,
     export_nud.ExportNud,
     export_image.SM4SH_PT_image_export_panel,
     export_material.SM4SH_PT_material_export_panel,

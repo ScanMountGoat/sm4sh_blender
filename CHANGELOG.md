@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## unreleased
+### Added
+* Added support for importing single animations from omo files.
+
 ### Fixed
 * Fixed an issue where image texture nodes would incorrectly use "Clip" instead of "Extend". This fixes rendering issues for some materials.
 
